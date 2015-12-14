@@ -1,8 +1,9 @@
 ---
-title: "Master - Predicting baby weight - v1 - [STAT W4702] Statistical Inference & Modelling Group Project"
+title: Master - Predicting baby weight - v1 - [STAT W4702] Statistical Inference &
+  Modelling Group Project
 author: "Arushi Arora, Alexander Makarov, Eloi Morlaas, Gary Sztajnman"
 date: "December 15, 2015"
-output: pdf_document
+output: word_document
 ---
 #Abstract
 
