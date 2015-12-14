@@ -67,14 +67,14 @@ The following charts demonstrate boxplots and splits of the `baby.grams` data po
 ```{r, echo = FALSE}
 library(ggplot2)
 bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = race)) + geom_point()
-bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "fixed")
+bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "fixed", labeller = label_both)
 ```
 
 First chart shows some evidence in importance of race in predicting the risk of giving birth to low weight baby, as well as smoking habits during pregnancy. Facet scatterplots show that data point corresponding to each of these factors' combinations group around different median values, which can suggest their predictive power on the newborn infant's weight. 
 
 ```{r, echo = FALSE}
 bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = physician.visits)) + geom_point()
-bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "fixed")
+bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "fixed", labeller = label_both)
 ```
 
 The second chart splits all the observations in sample into several groups by number of physician vistis in the first trimester and occurance of premature labor by each subject of the study. For mothers without previous premature births no significant difference is observed with repsect to number of physician visits, whereas women who had premature labors before are exposed to the higher risk of giving birth to low weight baby if they do not pay enough visits to physician during the first trimester of their pregnancy term. However, we need to account for existing outliers in the sample dataset, as there are at three observations of infants that were born with weight less than or equal to 1 kg, which significantly differs from the majority of observations in this dataset.
@@ -323,7 +323,7 @@ bwt <- with(birthwt, {
   ptd <- factor(ptl > 0)
   ftv <- factor(ftv)
   levels(ftv)[-(1:2)] <- "2+"
-  data.frame(low, age, lwt, race, smoke = (smoke > 0),
+  data.frame(as.factor(low), age, lwt, race, smoke = (smoke > 0),
              ptd, ht = (ht > 0), ui = (ui > 0), ftv)
 })
 colnames(bwt) <- c("below.2500", "mother.age", 
