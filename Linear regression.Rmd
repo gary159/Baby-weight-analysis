@@ -1,7 +1,7 @@
 ---
-title: 'Lecture 9: Models With Data'
-author: "Babies"
-date: "12 December 2015"
+title: 'Fat babies - linear part'
+author: "Gary"
+date: "14 December 2015"
 output: pdf_document
 ---
 
@@ -32,6 +32,17 @@ train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
 bwt.grams.train <- bwt.grams[train,]
 bwt.grams.test <- bwt.grams[-train,]
 
+```
+
+We would like to try different linear model in order to predict the weight of a baby.
+In order to decide which predictos to choose, we use multiple techniques: 
+
+  - the best subset selection which fit a separate least squares regression for each possible combination of the p predictors.
+  - the ridge regression 
+  - the lasso regression
+
+```{r}
+
 library (leaps)
 regfit.full=regsubsets(baby.grams~., bwt.grams.train, nvmax =19)
 reg.summary = summary(regfit.full)
@@ -54,62 +65,81 @@ min.bic
 plot(reg.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
 points (min.bic, reg.summary$bic [min.bic], col =" red",cex =2, pch =20)
 
+```
+We applied the best subset method on the training set and we note that all 3 indicators converge in the idea that we should only 6 predicators in our analysis.
+```{r}
+
 plot(regfit.full ,scale ="r2")
 plot(regfit.full ,scale ="adjr2")
 plot(regfit.full ,scale ="Cp")
 plot(regfit.full ,scale ="bic")
 
-coef(regfit.full, max.adjr2) 
-coef(regfit.full, min.cp)
-coef(regfit.full, min.bic)
 
+```
+We select the predictors that minimize RSS: mother.weight, race, smoke, hypertension, uterine
 
+Now we want to measure the quality of a linear regression using the predictors selected  by the best subset method.
+```{r}
 
 #Linear regression with the predictors selected by best subset
 lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams.train)
 summary(lm.fit)
-confint(lm.fit)
-par(mfrow = c(2, 2))
-plot(lm.fit)
+```
+Based on the summary, we note that the linear regression model is decent as all predictors have a p-value lower than 0.05 however the R^2 is small with a value of 0.31
 
+We will know apply or model on the test set in order to test its accuracy
+```{r}
+par(mfrow = c(1, 1))
 lm.fit.res= predict(lm.fit, bwt.grams.test)
 mean((lm.fit.res -bwt.grams.test$baby.grams)^2)
 plot(bwt.grams.test$baby.grams,lm.fit.res)
 abline (0,1)
 
+```
+Here we note that this linear model has a low accuracy on our test set with a MSE of 0.46
 
+We will then try a 2 shrinkage methods
+```{r}
 
 library(glmnet)
-##
+## Preparing the dataset for glmnet
 bwt.x.train=model.matrix( baby.grams~., data=bwt.grams.train)[,-1]
 bwt.y.train=bwt.grams.train$baby.grams
 
 bwt.x.test=model.matrix( baby.grams~., data=bwt.grams.test)[,-1]
 bwt.y.test=bwt.grams.test[,1]
 
-grid.bwt =10^seq (-1,4, length =100)
-
+grid.bwt =10^seq (-2,.5, length =100)
+plot(grid.bwt)
+par(mfrow = c(1, 2))
+```
+In both case (ridge and lasso), we will test 100 different tuning parameter lambda to find the one that minimize the error on 6 folds cross validation.
+As our database is quite small, we will change the default number of folds from k = 10 folds to k =6.
+```{r}
 # With alpha =0, glmnet computes the ridge
 
 ridge =cv.glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =grid.bwt, nfolds=6)
 plot(ridge)
+ridge$lambda.min
 ridge.opt = glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =ridge$lambda.min)
-ridge.opt$beta
 ridge.opt.res = predict(ridge.opt, s =ridge$lambda.min, newx=bwt.x.test)
 mean((ridge.opt.res -bwt.y.test)^2)
-
+```
+For the ridge regression we minimize our MSE for a tuning parameter of 0.145. We then perform the ridge regression on the full training set to compute the optimal coefficients. 
+Finally, we test our model and obtain an MSE of 0.416
+```{r}
 # With alpha =1, glmnet computes the lasso
+
 lasso =cv.glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =grid.bwt, nfolds=6)
 lasso$lambda.min
 plot(lasso)
 lasso.opt = glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =lasso$lambda.min)
-lasso.opt$beta
 lasso.opt.res = predict(lasso.opt, s =lasso$lambda.min, newx=bwt.x.test)
 mean((lasso.opt.res -bwt.y.test)^2)
 ```
 
-
-
+For the ridge regression we minimize our MSE for a tuning parameter of 0.017. We then perform the lasso regression on the full training set to compute the optimal coefficients. 
+Finally, we test our model and obtain an MSE of 0.428
 
 
 
