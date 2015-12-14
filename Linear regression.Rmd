@@ -26,6 +26,7 @@ colnames(bwt.grams) <- c("baby.grams", "mother.age",
                        "hypertension", "uterine",
                        "physician.visits")
 
+#create train and test
 set.seed(1)
 train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
 bwt.grams.train <- bwt.grams[train,]
