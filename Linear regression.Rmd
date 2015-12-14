@@ -1,0 +1,114 @@
+---
+title: 'Lecture 9: Models With Data'
+author: "Babies"
+date: "12 December 2015"
+output: pdf_document
+---
+
+
+
+```{r}
+library(MASS)
+data(birthwt)
+
+bwt.grams <- with(birthwt, {
+  bwt <- bwt/1000
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(bwt, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt.grams) <- c("baby.grams", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+
+set.seed(1)
+train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
+bwt.grams.train <- bwt.grams[train,]
+bwt.grams.test <- bwt.grams[-train,]
+
+library (leaps)
+regfit.full=regsubsets(baby.grams~., bwt.grams.train, nvmax =19)
+reg.summary = summary(regfit.full)
+par(mfrow =c(2,2))
+plot(reg.summary$rss ,xlab=" Number of Variables ",ylab=" RSS", type="l")
+plot(reg.summary$adjr2 ,xlab =" Number of Variables ", ylab=" Adjusted RSq",type="l")
+max.adjr2=which.max (reg.summary$adjr2)
+max.adjr2
+points (max.adjr2, reg.summary$adjr2[max.adjr2], col ="red",cex =2, pch =20)
+
+
+plot(reg.summary$cp ,xlab =" Number of Variables ", ylab="Cp", type='l')
+min.cp= which.min (reg.summary$cp )
+min.cp
+points (min.cp, reg.summary$cp[min.cp], col ="red",cex =2, pch =20)
+
+
+min.bic = which.min(reg.summary$bic)
+min.bic
+plot(reg.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
+points (min.bic, reg.summary$bic [min.bic], col =" red",cex =2, pch =20)
+
+plot(regfit.full ,scale ="r2")
+plot(regfit.full ,scale ="adjr2")
+plot(regfit.full ,scale ="Cp")
+plot(regfit.full ,scale ="bic")
+
+coef(regfit.full, max.adjr2) 
+coef(regfit.full, min.cp)
+coef(regfit.full, min.bic)
+
+
+
+#Linear regression with the predictors selected by best subset
+lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams.train)
+summary(lm.fit)
+confint(lm.fit)
+par(mfrow = c(2, 2))
+plot(lm.fit)
+
+lm.fit.res= predict(lm.fit, bwt.grams.test)
+mean((lm.fit.res -bwt.grams.test$baby.grams)^2)
+plot(bwt.grams.test$baby.grams,lm.fit.res)
+abline (0,1)
+
+
+
+library(glmnet)
+##
+bwt.x.train=model.matrix( baby.grams~., data=bwt.grams.train)[,-1]
+bwt.y.train=bwt.grams.train$baby.grams
+
+bwt.x.test=model.matrix( baby.grams~., data=bwt.grams.test)[,-1]
+bwt.y.test=bwt.grams.test[,1]
+
+grid.bwt =10^seq (-1,4, length =100)
+
+# With alpha =0, glmnet computes the ridge
+
+ridge =cv.glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =grid.bwt, nfolds=6)
+plot(ridge)
+ridge.opt = glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =ridge$lambda.min)
+ridge.opt$beta
+ridge.opt.res = predict(ridge.opt, s =ridge$lambda.min, newx=bwt.x.test)
+mean((ridge.opt.res -bwt.y.test)^2)
+
+# With alpha =1, glmnet computes the lasso
+lasso =cv.glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =grid.bwt, nfolds=6)
+lasso$lambda.min
+plot(lasso)
+lasso.opt = glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =lasso$lambda.min)
+lasso.opt$beta
+lasso.opt.res = predict(lasso.opt, s =lasso$lambda.min, newx=bwt.x.test)
+mean((lasso.opt.res -bwt.y.test)^2)
+```
+
+
+
+
+
+
