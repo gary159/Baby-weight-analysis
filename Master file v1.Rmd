@@ -4,3 +4,76 @@ author: "Arushi Arora, Alexander Makarov, Eloi Morlaas, Gary Sztajnman"
 date: "December 15, 2015"
 output: pdf_document
 ---
+#Abstract
+
+#Data Set
+This project was conducted on the Low Birth Weight dataset collected in 1986 at Baystate Medical Center, Springfield, Massachusetts as a part of a bigger study on the factors influencing newborn infants' health and risk of serious health problems potentially leading to death. This dataset is distributed as a part of `MASS` library and contains **189 observations** and **10 variables**, among which `bwt` represents the newborn infant's weight in grams and is used as the variable of interest we are trying to predict. The other 9 variables stand for different factors related to mother's physiological parameters, such as age, weight and race, their health-related habits and behavior during pregnancy (smoking habits, presence of uterine irritability and number of physician visits). Also there is a low birth weight indicator `low`, which is defined as a binary variable showing whether the weight of an infant is below 2500 grams or not. Brief description of each variable is provided in the table below.
+
+The goal of our research is to identify relationship between these variables and infant weight and understand the influence of each of them on the explained variable. The project pursue both inferential and predictive goals as it is equally important to be able to obtain inference about factors affecting newborn's health and to be able to react on the potential health risks in a timely manner, when the model predicts the low birth weight outcome for a certain observation. In order to accomplish this goal we tried to fit multiple linear and non-linear models exploring the rationale that could provide the evidence for certain types of models and finding balance between interpretability and predictive power of the model.
+
+
+##Cleaning and Exploring Dataset
+For the purposes of the research the dataset was cleaned in the following way:  
+
+* birth weight variable `bwt` is converted from grams to kilgrams to reduce the order of magnitude for estimated model coefficients and error values;
+* factor variable `race` was assigned with proper labels `white`, `black` and `other`;
+* physisian visits were converted to a factor variable `ftv` with 3 labels `0`, `1` and `2+`;
+* response is defined as an exact amount of infant's weight from `bwt`;
+* all the columns are assigned with meaningful names.
+
+Variable description table and summary statistics of the tidy dataset are provided below.
+
+Variable | Description
+---------|------------
+`baby.grams`|weight of newborn infant in kg
+`mother.age`|mother's age in years
+`mother.weight`|mother's weight in pounds at last menstrual period
+`race`|mother's race, factor variable with following labels: *white*, *black* or *other*
+`smoke`|smoking status during pregnancy, binary variable
+`prem.labor`|binary variable showing whether mother had premature labors before or not
+`hypertension`|binary variable showing whether mother had hypertension or not
+`uterine`|binary variable showing presence of uterine irritability
+`physician.visits`|number of physician visits during the first trimester: *0*, *1* or *2+*
+
+```{r, echo = FALSE}
+library(MASS)
+data(birthwt)
+bwt.grams <- with(birthwt, {
+  bwt <- bwt/1000
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(bwt, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt.grams) <- c("baby.grams", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+summary(bwt.grams)
+```
+
+Datatset has only 2 quantitative variables apart from infant weights, however, as shown in the table below, they do not demonstrate strong correlation between each other, which suggests that these variables will not be sufficient themselves in explaining birth weight variation. Variable `mother.age` demonstrates the lowest correlation with `baby.grams` and will most probably be omitted in the prediction models further on.
+
+```{r, echo = FALSE}
+cor(bwt.grams[,1:3])
+```
+
+The following charts demonstrate boxplots and splits of the `baby.grams` data points vs `mother.weight` across various categorical and binary variables that make part of the working dataset. 
+
+```{r, echo = FALSE}
+library(ggplot2)
+bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = race)) + geom_point()
+bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "fixed", labeller = label_both)
+```
+
+First chart shows some evidence in importance of race in predicting the risk of giving birth to low weight baby, as well as smoking habits during pregnancy. Facet scatterplots show that data point corresponding to each of these factors' combinations group around different median values, which can suggest their predictive power on the newborn infant's weight. 
+
+```{r, echo = FALSE}
+bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = physician.visits)) + geom_point()
+bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "fixed", labeller = label_both)
+```
+
+The second chart splits all the observations in sample into several groups by number of physician vistis in the first trimester and occurance of premature labor by each subject of the study. For mothers without previous premature births no significant difference is observed with repsect to number of physician visits, whereas women who had premature labors before are exposed to the higher risk of giving birth to low weight baby if they do not pay enough visits to physician during the first trimester of their pregnancy term. However, we need to account for existing outliers in the sample dataset, as there are at three observations of infants that were born with weight less than or equal to 1 kg, which significantly differs from the majority of observations in this dataset.
