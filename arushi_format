@@ -1,0 +1,403 @@
+---
+title: "Master - Predicting baby weight - v1 - [STAT W4702] Statistical Inference & Modelling Group Project"
+author: "Arushi Arora, Alexander Makarov, Eloi Morlaas, Gary Sztajnman"
+date: "December 15, 2015"
+output: pdf_document
+---
+#Abstract
+
+#Data Set
+This project was conducted on the Low Birth Weight dataset collected in 1986 at Baystate Medical Center, Springfield, Massachusetts as a part of a bigger study on the factors influencing newborn infants' health and risk of serious health problems potentially leading to death. This dataset is distributed as a part of `MASS` library and contains **189 observations** and **10 variables**, among which `bwt` represents the newborn infant's weight in grams and is used as the variable of interest we are trying to predict. The other 9 variables stand for different factors related to mother's physiological parameters, such as age, weight and race, their health-related habits and behavior during pregnancy (smoking habits, presence of uterine irritability and number of physician visits). Also there is a low birth weight indicator `low`, which is defined as a binary variable showing whether the weight of an infant is below 2500 grams or not. Brief description of each variable is provided in the table below.
+
+The goal of our research is to identify relationship between these variables and infant weight and understand the influence of each of them on the explained variable. The project pursue both inferential and predictive goals as it is equally important to be able to obtain inference about factors affecting newborn's health and to be able to react on the potential health risks in a timely manner, when the model predicts the low birth weight outcome for a certain observation. In order to accomplish this goal we tried to fit multiple linear and non-linear models exploring the rationale that could provide the evidence for certain types of models and finding balance between interpretability and predictive power of the model.
+
+
+##Cleaning and Exploring Dataset
+For the purposes of the research the dataset was cleaned in the following way:  
+
+* birth weight variable `bwt` is converted from grams to kilgrams to reduce the order of magnitude for estimated model coefficients and error values;
+* factor variable `race` was assigned with proper labels `white`, `black` and `other`;
+* physisian visits were converted to a factor variable `ftv` with 3 labels `0`, `1` and `2+`;
+* response is defined as an exact amount of infant's weight from `bwt`;
+* all the columns are assigned with meaningful names.
+
+Variable description table and summary statistics of the tidy dataset are provided below.
+
+Variable | Description
+---------|------------
+`baby.grams`|weight of newborn infant in kg
+`mother.age`|mother's age in years
+`mother.weight`|mother's weight in pounds at last menstrual period
+`race`|mother's race, factor variable with following labels: *white*, *black* or *other*
+`smoke`|smoking status during pregnancy, binary variable
+`prem.labor`|binary variable showing whether mother had premature labors before or not
+`hypertension`|binary variable showing whether mother had hypertension or not
+`uterine`|binary variable showing presence of uterine irritability
+`physician.visits`|number of physician visits during the first trimester: *0*, *1* or *2+*
+
+```{r, echo = FALSE}
+library(MASS)
+data(birthwt)
+bwt.grams <- with(birthwt, {
+  bwt <- bwt/1000
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(bwt, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt.grams) <- c("baby.grams", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+summary(bwt.grams)
+```
+
+Datatset has only 2 quantitative variables apart from infant weights, however, as shown in the table below, they do not demonstrate strong correlation between each other, which suggests that these variables will not be sufficient themselves in explaining birth weight variation. Variable `mother.age` demonstrates the lowest correlation with `baby.grams` and will most probably be omitted in the prediction models further on.
+
+```{r, echo = FALSE}
+cor(bwt.grams[,1:3])
+```
+
+The following charts demonstrate boxplots and splits of the `baby.grams` data points vs `mother.weight` across various categorical and binary variables that make part of the working dataset. 
+
+```{r, echo = FALSE}
+library(ggplot2)
+bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = race)) + geom_point()
+bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "fixed", labeller = label_both)
+```
+
+First chart shows some evidence in importance of race in predicting the risk of giving birth to low weight baby, as well as smoking habits during pregnancy. Facet scatterplots show that data point corresponding to each of these factors' combinations group around different median values, which can suggest their predictive power on the newborn infant's weight. 
+
+```{r, echo = FALSE}
+bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = physician.visits)) + geom_point()
+bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "fixed", labeller = label_both)
+```
+
+The second chart splits all the observations in sample into several groups by number of physician visits in the first trimester and occurance of premature labor by each subject of the study. For mothers without previous premature births no significant difference is observed with repsect to number of physician visits, whereas women who had premature labors before are exposed to the higher risk of giving birth to low weight baby if they do not pay enough visits to physician during the first trimester of their pregnancy term. However, we need to account for existing outliers in the sample dataset, as there are at three observations of infants that were born with weight less than or equal to 1 kg, which significantly differs from the majority of observations in this dataset.
+
+
+
+\section*{Non parametric analysis}
+
+We have a dataset containing the weights of the babies of 189 women. We want to explore this dataset so as to understand what are the factors responsible for a low weight baby. It is relevant to ask such a question because low weight babies have a higher mortality rate than normal or over weight babies. Thus, understanding the factors that can influence the baby weight is an important question. 
+First lets have a look on the distribution of the babies' weights.
+
+```{r}
+hist(bwt.grams$baby.grams, breaks=50, xlab='Baby weight in grams', main = 'Histogram of the babies weight')
+```
+
+Given this histogram it is quite hard to estimate if the data is truly normally distributed, thus we can draw the corresponding QQ plot.
+
+```{r}
+qqnorm(bwt.grams$baby.grams, main="QQ plot")
+qqline(bwt.grams$baby.grams)
+```
+
+Here we can notice that the observations are quite well aligned on the line which means that the sample quantiles correspond to the quantile of a theoritical normal distribution. So as to test this hypothesis we can run a Shapiro-Wilk test.
+
+```{r}
+shapiro.test(bwt.grams$baby.grams)
+```
+We have a very high p-value that is significantly greater than 0.05 thus we can accept the null hypothesis of the test and conclude that our data is normally distributed.
+
+```{r}
+plot(factor(birthwt$smoke, labels=c('no', 'yes')), birthwt$bwt, xlab="Does the mother smoke ?", ylab="Babies weights")
+```
+
+We can see that the variable "smoke" seems to have a negative influence on the weight of the baby. We want to statistically verify our assumption. Even if we know that we can assume the data to be normally distributed we can notheless try a non parametric approach to answer the question by running a Mann-Whitney test. With this test we determine whether the median of the babies weights differs between two groups: when the mother smokes or not. For this test to work we need the distribution of babies weight to have the same shape in both groups. We can easily verify it in these histograms.
+
+```{r}
+hist(bwt.grams$baby.grams[bwt.grams$smoke==FALSE], breaks=20, main='Histogram non smoker', xlab="Babies weights")
+hist(bwt.grams$baby.grams[bwt.grams$smoke==TRUE], breaks=20, main='Histogram smokers', xlab='Babies weights')
+wilcox.test(bwt.grams$baby.grams ~ bwt.grams$smoke)
+```
+
+We can see that the p-value is below 0.05 thus we can reject the null hypothesis and conclude that the median of our two populations are not equal, thus the variable "smoke" appears to be a variable that can have a certain predictive power in predicting the baby's weight. Nevertheless here we have seen that we can assume the data to be normally distributed thus it is more appropriate to do the alternative parametric test: a 2 sample t-test. Indeed, parametric tests are usually more powerful than their corresponding non parametric tests. Thus, we are less likely to reject the null hypothesis when it is false. Then, if we run a t-test we have the following results:
+
+```{r}
+t.test(bwt.grams$baby.grams[bwt.grams$smoke==FALSE], bwt.grams$baby.grams[bwt.grams$smoke==TRUE])
+```
+We can notice that this test is considering the mean and not the median as before. We have here a very low p-value that allows us to reject the null hypothesis and conclude that the difference in means of the two samples is not equal to 0. It confirms that the variable "smoke" is a discriminative variable for predicting the weight. 
+
+
+
+
+\section{linear models}
+We would like to try different linear model in order to predict the weight of a baby.
+In order to decide which predictors to choose, we use multiple techniques: 
+
+  - the best subset selection which fit a separate least squares regression for each possible combination of the p predictors.
+  - the ridge regression 
+  - the lasso regression
+
+\section{Best subset selection}
+```{r}
+#create train and test
+set.seed(1)
+train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
+bwt.grams.train <- bwt.grams[train,]
+bwt.grams.test <- bwt.grams[-train,]
+
+library (leaps)
+regfit.full=regsubsets(baby.grams~., bwt.grams.train, nvmax =19)
+reg.summary = summary(regfit.full)
+par(mfrow =c(2,2))
+plot(reg.summary$rss ,xlab=" Number of Variables ",ylab=" RSS", type="l")
+plot(reg.summary$adjr2 ,xlab =" Number of Variables ", ylab=" Adjusted RSq",type="l")
+max.adjr2=which.max (reg.summary$adjr2)
+points (max.adjr2, reg.summary$adjr2[max.adjr2], col ="red",cex =2, pch =20)
+
+
+plot(reg.summary$cp ,xlab =" Number of Variables ", ylab="Cp", type='l')
+min.cp= which.min (reg.summary$cp )
+points (min.cp, reg.summary$cp[min.cp], col ="red",cex =2, pch =20)
+
+
+min.bic = which.min(reg.summary$bic)
+plot(reg.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
+points (min.bic, reg.summary$bic [min.bic], col =" red",cex =2, pch =20)
+
+```
+We applied the best subset method on the training set and we compare 3 indicators: BIC, Cp and adjusted R^2. All 3 indicators converge in the idea that we should only consider 6 predicators in our analysis.
+```{r}
+par(mfrow =c(1,1))
+plot(regfit.full ,scale ="Cp")
+
+
+```
+We select the predictors that minimize RSS: mother.weight, race, smoke, hypertension, uterine
+
+Now we want to measure the quality of a linear regression using the predictors selected  by the best subset method.
+```{r}
+
+#Linear regression with the predictors selected by best subset
+lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams.train)
+summary(lm.fit)
+```
+Based on the summary, we note that the linear regression model is decent as all predictors have a p-value lower than 0.05 however the R^2 is small with a value of 0.31
+
+We will know apply or model on the test set in order to test its accuracy
+```{r}
+par(mfrow = c(1, 1))
+lm.fit.res= predict(lm.fit, bwt.grams.test)
+mean((lm.fit.res -bwt.grams.test$baby.grams)^2)
+#plot(bwt.grams.test$baby.grams,lm.fit.res)
+#abline (0,1)
+
+```
+Here we note that this linear model has a low accuracy on our test set with a MSE of 0.46
+
+We will then try 2 shrinkage methods
+\section{Shrinkage methods}
+```{r}
+
+library(glmnet)
+## Preparing the dataset for glmnet
+bwt.x.train=model.matrix( baby.grams~., data=bwt.grams.train)[,-1]
+bwt.y.train=bwt.grams.train$baby.grams
+
+bwt.x.test=model.matrix( baby.grams~., data=bwt.grams.test)[,-1]
+bwt.y.test=bwt.grams.test[,1]
+
+grid.bwt =10^seq (-2,.5, length =100)
+par(mfrow = c(2, 2))
+```
+In both case (ridge and lasso), we will test 100 different tuning parameter lambda to find the one that minimize the error on 6 folds cross validation.
+As our database is quite small, we will change the default number of folds from k = 10 folds to k =6.
+\section{Ridge regression}
+```{r}
+# With alpha =0, glmnet computes the ridge
+
+ridge =cv.glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =grid.bwt, nfolds=6)
+ridge$lambda.min
+ridge.opt = glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =ridge$lambda.min)
+ridge.opt.res = predict(ridge.opt, s =ridge$lambda.min, newx=bwt.x.test)
+mean((ridge.opt.res -bwt.y.test)^2)
+```
+For the ridge regression we minimize our MSE for a tuning parameter of 0.145. We then perform the ridge regression on the full training set to compute the optimal coefficients. 
+Finally, we test our model and obtain an MSE of 0.416
+
+\section{Lasso regression}
+```{r}
+# With alpha =1, glmnet computes the lasso
+
+lasso =cv.glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =grid.bwt, nfolds=6)
+par(mfrow = c(1, 2))
+plot(lasso, main="Best MSE for lasso regression")
+plot(ridge, main="Best MSE for ridge regression")
+lasso$lambda.min
+lasso.opt = glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =lasso$lambda.min)
+lasso.opt.res = predict(lasso.opt, s =lasso$lambda.min, newx=bwt.x.test)
+mean((lasso.opt.res -bwt.y.test)^2)
+```
+
+For the ridge regression we minimize our MSE for a tuning parameter of 0.017. We then perform the lasso regression on the full training set to compute the optimal coefficients. 
+Finally, we test our model and obtain an MSE of 0.428
+
+
+##Polynomial Model
+```{r}
+#Polynomial fit for best subset
+poly.fit.1 = lm(baby.grams ~ hypertension + uterine + smoke + race  
+                + poly(mother.weight, 2), data = bwt.grams.train)
+mean((predict.lm(poly.fit.1, bwt.grams.test) - bwt.grams.test[,1])^2)
+plot(sort(predict.lm(poly.fit.1, bwt.grams.test)), bwt.grams.test[,1], 
+            xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
+```   
+  
+When we fit a polynomial model on the predictors obtained from best subset, we observe a Mean Squared Error of `0.4813745`. The smaller the Mean Squared Error, the closer the fit is to the data. But, as he value of MSE is high, it suggests that this model does not provide a good fit for the data. The plot also shows that there are irregularities in the prediction and that the polynomial model of degree 2 obtained by using predictors suggested by the best subset is not sufficient.    
+
+Different models were tried by increasing the degree of the polynomial but still using the predictors suggested by the best subset and the following results were obtained:  
+```{r}
+poly.fit.2 = lm(baby.grams ~ hypertension + uterine + smoke + race  
+                + poly(mother.weight, 3), data = bwt.grams.train)
+mean((predict.lm(poly.fit.2, bwt.grams.test) - bwt.grams.test[,1])^2)
+
+poly.fit.3 = lm(baby.grams ~ hypertension + uterine + smoke + race  
+                + poly(mother.weight, 4), data = bwt.grams.train)
+mean((predict.lm(poly.fit.3, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+We note that as the degree of the polynomial increases, the MSE decreases, but the drop is not significant, suggesting that these predictors are not sufficient enough to predict the correct baby weight.  
+  
+When we remove the predictors with very low _p-values_, which were suggested by the best subset - namely `smoke`, `race` and add other predictors which were rejected by the best-subset, namely - `mother.age`, `prem.labor` and `physician.visits`, we see that the Mean Squared Error starts to decrease. A low MSE denotes a better fit. Thus, the predictors which were rejected by the best subset selection, were actually significant in predicting the correct birthweight.   
+  
+```{r}
+poly.fit.4 = lm(baby.grams ~ hypertension + uterine + poly(mother.age,2)  
+                + poly(mother.weight,3), data = bwt.grams.train)
+mean((predict.lm(poly.fit.4, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+When we fit a polynomial model using `mother.age` as one of the predictors, we see a significant change in the Mean Squared Error value. Even though best-subset rejected `mother.age`, the lower Mean Squared Error denotes that the predictor does affect the baby weight - `baby.grams`. Thus, clearly the fact that `mother.age` affects the `baby.grams` cannot be rejected.  
+
+Now, we try another model, where we will choose some of the predictors suggested by the best-subset and some predictors from the previous model. We fit a polynomial of degree `2` on `mother.age` and a degree `3` polynomial on `mother.weight`. When the predict the `baby.grams` on the test set, we observe a mean squared error of `0.3865828`, which is not a big significant change from `0.3890751` - the mean squared error from `poly.fit.4`.  
+  
+
+```{r}
+poly.fit.5 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,3), data = bwt.grams.train)
+mean((predict.lm(poly.fit.5, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+Now we increase the degrees of the polynomials to figure out if the mean squared error reduces as the degree of the polynomial increases.  
+  
+```{r}
+poly.fit.6 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,9), data = bwt.grams.train)
+mean((predict.lm(poly.fit.6, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+It is no surprise that the MSE decreases as the degree of the polynomial increases. The lowest MSE obtained is `0.3214657` which is obtained when `mother.weight` is used as a predictor as a polynomial of degree `9`. This can be confirmed from the following plot:  
+
+```{r}
+MSE = 1:13
+for (k in 1:13)
+{
+  poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,k), data = bwt.grams.train)
+  pred = predict(poly.fit, bwt.grams.test)
+  mse = mean((pred-bwt.grams.test$baby.grams)^2)
+  MSE[k] = mse
+}
+plot(c(1:13), MSE, type='b', main='Evolution of the MSE', xlab='Degree of Polynomial')
+abline(MSE[9], 0, col='RED')
+```  
+  
+The plot above suggests that the lowest MSE is obtained when the degree is `9` and as the degree of the polynomial increases above 9, the MSE starts increasing. The MSE versus Degree of Polynomial plot is a U-shaped curve.  
+  
+We now plot the predicted weight vs actual weight of the babies on the test data set:  
+  
+```{r}
+plot(sort(predict.lm(poly.fit.6, bwt.grams.test)), bwt.grams.test[,1], 
+            xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
+```  
+  
+If we compare this plot to the first plot of Predicted vs Actual baby weight, we can clearly see that this is a much better fitting model.
+
+
+
+# Splines Analysis
+```{r}
+library(splines)
+poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+pred = predict.lm(poly.fit, bwt.grams.test)
+mse = mean((pred - bwt.grams.test[,1])^2)
+mse
+```
+
+Now that we have tried a lot of different polynomial regressions we can wonder if it is possible to improve our best polynomial model by introducing splines. Here we added in the regression formula several basis functions for the variable $mother.weight$. Between each knots we fit a $9-degree-polynomial$. We tried different values for the number of degrees of freedom so as to find the best parameter. Here is the resulting plot:
+
+```{r}
+max_df = 20
+MSE = 9:(max_df)
+for (k in 9:max_df){
+    splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+                     + bs(mother.weight, df=k, degree=9) + poly(mother.age, 2), 
+                     data=bwt.grams.train)
+    pred = predict(splines.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-8] = mse
+}
+plot(9:max_df, MSE, xlab='Degrees of freedom', 
+     ylab='Test MSE', 
+     main='Evolution of the test MSE with the number of degrees of freedom', 
+     type='b')
+abline(.3214657, 0, col='RED')
+legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
+```
+
+The minimum MSE is obtained when we have 14 degrees of freedom. With the R built-in function $bs()$, R automatically puts knots on the quantile values of the variable. Here for 14 degrees of freedom our knots are: $q_{16.7}$, $q_{33.3}$, $q_{50}$, $q_{66.7}$ and $q_{83.3}$. Thus between each quantile R fits a degree 9 polynomial on the mothers' weights. It also makes sure that the 1st, 2nd, ... and 8th derivatives are continuous at each knots. Thus the relation between the number of degrees of freedom $d$ and the number of knots $K$ is the following: $$d = K + 9$$ We can see that this formula is verified in our case ($14 = 5 + 9$). 
+
+# With natural splines
+```{r}
+max_df = 20
+MSE = 3:(max_df)
+for (k in 3:max_df){
+    splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+                  + ns(mother.weight, df=k) + poly(mother.age, 2), 
+                  data=bwt.grams.train)
+    pred = predict(splines.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-2] = mse
+}
+plot(3:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', 
+     main='Evolution of the test MSE withs the number of degrees of freedom', 
+     type='b', ylim=c(0.3,0.45))
+abline(.3214657, 0, col='RED')
+legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
+```
+
+When we try with natural splines we have worse results than with the normal splines model. It is mainly due to the fact that R can only fit cubic natural splines, there is no degree argument in the R built-in function.
+
+Now we can try to see if there is an improvement if we use smoothed splines. We have to use the General Additive Models R library to perform this analysis.
+
+```{r}
+library(gam)
+MSE = 4:18
+for (k in 4:18){
+    gam.fit = gam(baby.grams ~ prem.labor+uterine+ hypertension + smoke 
+                  + s(mother.weight, k) + poly(mother.age, 2), data=bwt.grams.train)
+    pred = predict(gam.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-3] = mse
+}
+plot(4:18, MSE, type='b', main='Evolution of the MSE', xlab='Degrees of freedom')
+```
+
+We can notice that the results are still not better than with our optimal model with degree 9 splines. The smoothing effect does not bring more predictive power to the final model. 
+To conclude this part on splines we managed to find a model that outperforms slightly our best polynomial model. This was expected as splines models are more flexible than polynomial models. Nonetheless the improvement in test MSE is quite low and we can wonder if the splines model is really better than the polynomial model. Indeed, fitting a degree nine polynomial between each splines brings a lot of flexibility to the model but the increase of variance can be huge too. If we have had more observations we could have answered to this question by testing our models on a big test set. Nevertheless we can run a ANOVA test to verify if the difference between our best polynomial model and our best splines model is really significant:
+
+```{r}
+best_poly = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+               + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+
+best_splines = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+                  + ns(mother.weight, df=14) + poly(mother.age, 2), data=bwt.grams.train)
+
+anova(best_poly, best_splines)
+```
+
+We can see that the resulting p-value is a little above $0.066$. Thus depending on the level of the test we want, we may reject or accept $H_0$. Nevertheless we can say that the difference of performance between those two tests is not obvious.
