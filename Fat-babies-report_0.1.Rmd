@@ -12,9 +12,10 @@ This project was conducted on the Low Birth Weight dataset collected in 1986 at 
 
 The goal of our research is to identify relationship between these variables and infant weight and understand the influence of each of them on the explained variable. The project pursue both inferential and predictive goals as it is equally important to be able to obtain inference about factors affecting newborn's health and to be able to react on the potential health risks in a timely manner, when the model predicts the low birth weight outcome for a certain observation. In order to accomplish this goal we tried to fit multiple linear and non-linear models exploring the rationale that could provide the evidence for certain types of models and finding balance between interpretability and predictive power of the model.
 
-##Cleaning Dataset
+##Cleaning and Exploring Dataset
 For the purposes of the research the dataset was cleaned in the following way:  
 
+* birth weight variable `bwt` is converted from grams to kilgrams to reduce the order of magnitude for estimated model coefficients and error values;
 * factor variable `race` was assigned with proper labels `white`, `black` and `other`;
 * physisian visits were converted to a factor variable `ftv` with 3 labels `0`, `1` and `2+`;
 * response is defined as an exact amount of infant's weight from `bwt`;
@@ -24,7 +25,7 @@ Variable description table and summary statistics of the tidy dataset are provid
 
 Variable | Description
 ---------|------------
-`baby.grams`|weight of newborn infant in grams
+`baby.grams`|weight of newborn infant in kg
 `mother.age`|mother's age in years
 `mother.weight`|mother's weight in pounds at last menstrual period
 `race`|mother's race, factor variable with following labels: *white*, *black* or *other*
@@ -55,68 +56,48 @@ colnames(bwt.grams) <- c("baby.grams", "mother.age",
 summary(bwt.grams)
 ```
 
-Datatset has only 3 quantitative variables, however, as shown in the table below, they do not demonstrate 
+Datatset has only 2 quantitative variables apart from infant weights, however, as shown in the table below, they do not demonstrate strong correlation between each other, which suggests that these variables will not be sufficient themselves in explaining birth weight variation. Variable `mother.age` demonstrate the lowest correlation with `baby.grams` and will most probably be omitted in the prediction models further on.
+
 ```{r, echo = FALSE}
 cor(bwt.grams[,1:3])
 ```
 
+The following charts demonstrate boxplots and splits of the `baby.grams` data points vs `mother.weight` across various categorical and binary variables that make part of the working dataset. 
+
 ```{r, echo = FALSE}
 library(ggplot2)
 bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = race)) + geom_point()
-bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "free")
+bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "fixed")
 ```
+
+First chart shows some evidence in importance of race in predicting the risk of giving birth to low weight baby, as well as smoking habits during pregnancy. Facet scatterplots show that data point corresponding to each of these factors' combinations group around different median values, which can suggest their predictive power on the newborn infant's weight. 
 
 ```{r, echo = FALSE}
 bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = physician.visits)) + geom_point()
-bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "free")
+bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "fixed")
 ```
 
-```{r}
+The second chart splits all the observations in sample into several groups by number of physician vistis in the first trimester and occurance of premature labor by each subject of the study. For mothers without previous premature births no significant difference is observed with repsect to number of physician visits, whereas women who had premature labors before are exposed to the higher risk of giving birth to low weight baby if they do not pay enough visits to physician during the first trimester of their pregnancy term. However, we need to account for existing outliers in the sample dataset, as there are at three observations of infants that were born with weight less than or equal to 1 kg, which significantly differs from the majority of observations in this dataset.
+
+##Exploring Linear Relationships
+
+Our first attempt to find a statistically significant model fit will go through fitting linear model of different factors in dataset vs `baby.grams`, which is the variable of our interest.
+
+For the purposes of further validation and comparison of results we attribute 75% of the data to training set, saving the rest of the observations for test set.
+
+```{r, echo = FALSE}
 set.seed(1)
 train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
+bwt.grams.train <- bwt.grams[train,]
+bwt.grams.test <- bwt.grams[-train,]
 ```
 
+As dataset consists of only 8 explaining variables, it is computationally acceptable to select the best possible subset of the variables explaining the response of the model.
+
 ```{r}
-library(MASS)
-data(birthwt)
-bwt <- with(birthwt, {
-  race <- factor(race, labels = c("white", "black", "other"))
-  ptd <- factor(ptl > 0)
-  ftv <- factor(ftv)
-  levels(ftv)[-(1:2)] <- "2+"
-  data.frame(low, age, lwt, race, smoke = (smoke > 0),
-             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
-})
-colnames(bwt) <- c("below.2500", "mother.age", 
-                       "mother.weight", "race",
-                       "smoke", "prem.labor", 
-                       "hypertension", "uterine",
-                       "physician.visits")
-
-bwt.grams <- with(birthwt, {
-  bwt <- bwt/1000
-  race <- factor(race, labels = c("white", "black", "other"))
-  ptd <- factor(ptl > 0)
-  ftv <- factor(ftv)
-  levels(ftv)[-(1:2)] <- "2+"
-  data.frame(bwt, age, lwt, race, smoke = (smoke > 0),
-             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
-})
-colnames(bwt.grams) <- c("baby.grams", "mother.age", 
-                       "mother.weight", "race",
-                       "smoke", "prem.labor", 
-                       "hypertension", "uterine",
-                       "physician.visits")
-summary(bwt)
-summary(bwt.grams)
-bwt[0:10,]
-bwt.grams[0:10,]
-attach(bwt.grams)
-
 library (leaps)
-regfit.full=regsubsets(baby.grams~., bwt.grams, nvmax =19)
+regfit.full=regsubsets(baby.grams~., bwt.grams.train, nvmax =19)
 reg.summary = summary(regfit.full)
-reg.summary$rsq
 par(mfrow =c(2,2))
 plot(reg.summary$rss ,xlab=" Number of Variables ",ylab=" RSS", type="l")
 plot(reg.summary$adjr2 ,xlab =" Number of Variables ", ylab=" Adjusted RSq",type="l")
@@ -124,99 +105,75 @@ max.adjr2=which.max (reg.summary$adjr2)
 max.adjr2
 points (max.adjr2, reg.summary$adjr2[max.adjr2], col ="red",cex =2, pch =20)
 
-
 plot(reg.summary$cp ,xlab =" Number of Variables ", ylab="Cp", type='l')
 min.cp= which.min (reg.summary$cp )
 min.cp
 points (min.cp, reg.summary$cp[min.cp], col ="red",cex =2, pch =20)
-
 
 min.bic = which.min(reg.summary$bic)
 min.bic
 plot(reg.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
 points (min.bic, reg.summary$bic [min.bic], col =" red",cex =2, pch =20)
 
-plot(regfit.full ,scale ="r2")
-plot(regfit.full ,scale ="adjr2")
-plot(regfit.full ,scale ="Cp")
-plot(regfit.full ,scale ="bic")
+par(mfrow = c(1,1))
+plot(regfit.full ,scale ="r2", cex.axis = 0.1, las = 1)
+plot(regfit.full ,scale ="adjr2", cex.axis = 0.1, las = 1)
+plot(regfit.full ,scale ="Cp", cex.axis = 0.1, las = 1)
+plot(regfit.full ,scale ="bic", cex.axis = 0.1, las = 1)
 
 coef(regfit.full, max.adjr2) 
 coef(regfit.full, min.cp)
 coef(regfit.full, min.bic)
 
-
-
-
-
-
-classfit.full=regsubsets(below.2500~., bwt, nvmax =19)
-class.summary = summary(classfit.full)
-class.summary$rsq
-par(mfrow =c(2,2))
-plot(class.summary$rss ,xlab=" Number of Variables ",ylab=" RSS", type="l")
-plot(class.summary$adjr2 ,xlab =" Number of Variables ", ylab=" Adjusted RSq",type="l")
-max.adjr2=which.max (class.summary$adjr2)
-max.adjr2
-points (max.adjr2, class.summary$adjr2[max.adjr2], col ="red",cex =2, pch =20)
-
-
-plot(class.summary$cp ,xlab =" Number of Variables ", ylab="Cp", type='l')
-min.cp= which.min (class.summary$cp )
-min.cp
-points (min.cp, class.summary$cp[min.cp], col ="red",cex =2, pch =20)
-
-
-min.bic = which.min(class.summary$bic)
-min.bic
-plot(class.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
-points (min.bic, class.summary$bic [min.bic], col =" red",cex =2, pch =20)
-
-plot(classfit.full ,scale ="r2")
-plot(classfit.full ,scale ="adjr2")
-plot(classfit.full ,scale ="Cp")
-plot(classfit.full ,scale ="bic")
-
-coef(classfit.full, max.adjr2) 
-coef(classfit.full, min.cp)
-coef(classfit.full, min.bic)
-
-
-
-#Let's compare classification and regression 
-par(mfrow =c(1,2))
-plot(classfit.full ,scale ="Cp")
-plot(regfit.full ,scale ="Cp")
-
-
-#Logistic regression with the predictors selected by best subset
-log.fit = glm( below.2500~ mother.weight+race+smoke+hypertension+uterine, family = binomial, data=bwt[train, ])
-summary(log.fit)
-confint(log.fit)
-par(mfrow = c(2, 2))
-plot(log.fit)
-
-pred.train <- predict(log.fit, type = "response")
-low.train <- sapply(pred.train, function(x) {ifelse(x > 0.5, 1, 0)})
-table(low.train, bwt$below.2500[train])
-mean(low.train == bwt$below.2500[train])
-
-pred.test <- predict(log.fit, newdata = bwt[-train, -1], type = "response")
-low.test <- sapply(pred.test, function(x) {ifelse(x > 0.5, 1, 0)})
-table(low.test, bwt$below.2500[-train])
-mean(low.test == bwt$below.2500[-train])
-
 #Linear regression with the predictors selected by best subset
-lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams)
+lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams.train)
 summary(lm.fit)
 confint(lm.fit)
 par(mfrow = c(2, 2))
 plot(lm.fit)
+
+lm.fit.res= predict(lm.fit, bwt.grams.test)
+mean((lm.fit.res -bwt.grams.test$baby.grams)^2)
+plot(bwt.grams.test$baby.grams,lm.fit.res)
+abline (0,1)
 ```
 
+###Fitting Penalized Linear Models
 
 ```{r}
+library(glmnet)
+##
+bwt.x.train=model.matrix( baby.grams~., data=bwt.grams.train)[,-1]
+bwt.y.train=bwt.grams.train$baby.grams
 
+bwt.x.test=model.matrix( baby.grams~., data=bwt.grams.test)[,-1]
+bwt.y.test=bwt.grams.test[,1]
+
+grid.bwt =10^seq (-1,4, length =100)
+
+# With alpha =0, glmnet computes the ridge
+
+ridge =cv.glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =grid.bwt, nfolds=6)
+plot(ridge)
+ridge.opt = glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =ridge$lambda.min)
+ridge.opt$beta
+ridge.opt.res = predict(ridge.opt, s =ridge$lambda.min, newx=bwt.x.test)
+mean((ridge.opt.res -bwt.y.test)^2)
+
+# With alpha =1, glmnet computes the lasso
+lasso =cv.glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =grid.bwt, nfolds=6)
+lasso$lambda.min
+plot(lasso)
+lasso.opt = glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =lasso$lambda.min)
+lasso.opt$beta
+lasso.opt.res = predict(lasso.opt, s =lasso$lambda.min, newx=bwt.x.test)
+mean((lasso.opt.res -bwt.y.test)^2)
+```
+
+##Testing for Non-linear Relationships
+
+###Fitting Polynomial Regression
+```{r}
 #Create train and test
 set.seed(1)
 train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
@@ -257,6 +214,146 @@ mean((predict.lm(poly.fit.5, bwt.grams.test) - bwt.grams.test[,1])^2)
 poly.fit.6 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + poly(mother.age,2) + poly(mother.weight,9), data = bwt.grams.train)
 mean((predict.lm(poly.fit.6, bwt.grams.test) - bwt.grams.test[,1])^2)
 ```
+
+###Fitting Natural Splines
+
+```{r, echo = FALSE}
+set.seed(1)
+train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
+bwt.grams.train <- bwt.grams[train,]
+bwt.grams.test <- bwt.grams[-train,]
+```
+
+```{r}
+library(splines)
+poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+pred = predict.lm(poly.fit, bwt.grams.test)
+mse = mean((pred - bwt.grams.test[,1])^2)
+mse
+```
+
+Now that we have tried a lot of different polynomial regressions we can wonder if it is possible to improve our best polynomial model by introducing splines. Here we added in the regression formula several basis functions for the variable $mother.weight$. Between each knots we fit a $9-degree-polynomial$. We tried different values for the number of degrees of freedom so as to find the best parameter. Here is the resulting plot:
+
+```{r}
+max_df = 20
+MSE = 9:(max_df)
+for (k in 9:max_df){
+    splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+                     + bs(mother.weight, df=k, degree=9) + poly(mother.age, 2), 
+                     data=bwt.grams.train)
+    pred = predict(splines.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-8] = mse
+}
+plot(9:max_df, MSE, xlab='Degrees of freedom', 
+     ylab='Test MSE', 
+     main='Evolution of the test MSE with the number of degrees of freedom', 
+     type='b')
+abline(.3214657, 0, col='RED')
+legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
+```
+
+The minimum MSE is obtained when we have 14 degrees of freedom. With the R built-in function $bs()$, R automatically puts knots on the quantile values of the variable. Here for 14 degrees of freedom our knots are: $q_{16.7}$, $q_{33.3}$, $q_{50}$, $q_{66.7}$ and $q_{83.3}$. Thus between each quantile R fits a degree 9 polynomial on the mothers' weights. It also makes sure that the 1st, 2nd, ... and 8th derivatives are continuous at each knots. Thus the relation between the number of degrees of freedom $d$ and the number of knots $K$ is the following: $$d = K + 9$$ We can see that this formula is verified in our case ($14 = 5 + 9$).
+
+Natural splines are fitted in order to account for more flexibility in the model in attempt to find a better fit.
+
+```{r}
+max_df = 20
+MSE = 3:(max_df)
+for (k in 3:max_df){
+    splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+                  + ns(mother.weight, df=k) + poly(mother.age, 2), 
+                  data=bwt.grams.train)
+    pred = predict(splines.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-2] = mse
+}
+plot(3:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', 
+     main='Evolution of the test MSE withs the number of degrees of freedom', 
+     type='b', ylim=c(0.3,0.45))
+abline(.3214657, 0, col='RED')
+legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
+```
+
+When we try with natural splines we have worse results than with the normal splines model. It is mainly due to the fact that R can only fit cubic natural splines, there is no degree argument in the R built-in function.
+
+Now we can try to see if there is an improvement if we use smoothed splines. We have to use the General Additive Models R library to perform this analysis.
+
+```{r}
+library(gam)
+MSE = 4:18
+for (k in 4:18){
+    gam.fit = gam(baby.grams ~ prem.labor+uterine+ hypertension + smoke 
+                  + s(mother.weight, k) + poly(mother.age, 2), data=bwt.grams.train)
+    pred = predict(gam.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-3] = mse
+}
+plot(4:18, MSE, type='b', main='Evolution of the MSE', xlab='Degrees of freedom')
+```
+
+We can notice that the results are still not better than with our optimal model with degree 9 splines. The smoothing effect does not bring more predictive power to the final model. 
+To conclude this part on splines we managed to find a model that outperforms slightly our best polynomial model. This was expected as splines models are more flexible than polynomial models. Nonetheless the improvement in test MSE is quite low and we can wonder if the splines model is really better than the polynomial model. Indeed, fitting a degree nine polynomial between each splines brings a lot of flexibility to the model but the increase of variance can be huge too. If we have had more observations we could have answered to this question by testing our models on a big test set. Nevertheless we can run a ANOVA test to verify if the difference between our best polynomial model and our best splines model is really significant:
+
+```{r}
+best_poly = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+               + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+
+best_splines = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
+                  + ns(mother.weight, df=14) + poly(mother.age, 2), data=bwt.grams.train)
+
+anova(best_poly, best_splines)
+```
+
+We can see that the resulting p-value is a little above $0.066$. Thus depending on the level of the test we want, we may reject or accept $H_0$. Nevertheless we can say that the difference of performance between those two tests is not obvious. Thus we will maybe prefer to keep the less complex model $ie$ the polynomial model.
+
+##Building Classification Model
+
+###Testing for Claassification Threshold
+
+
+
+###Fitting Logistic Regression
+
+```{r, echo = FALSE}
+library(MASS)
+data(birthwt)
+bwt <- with(birthwt, {
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(low, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt) <- c("below.2500", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+summary(bwt)
+```
+
+```{r}
+#Logistic regression with the predictors selected by best subset
+log.fit = glm( below.2500~ mother.weight+race+smoke+hypertension+uterine, family = binomial, data=bwt[train, ])
+summary(log.fit)
+confint(log.fit)
+par(mfrow = c(2, 2))
+plot(log.fit)
+
+pred.train <- predict(log.fit, type = "response")
+low.train <- sapply(pred.train, function(x) {ifelse(x > 0.5, 1, 0)})
+table(low.train, bwt$below.2500[train])
+mean(low.train == bwt$below.2500[train])
+
+pred.test <- predict(log.fit, newdata = bwt[-train, -1], type = "response")
+low.test <- sapply(pred.test, function(x) {ifelse(x > 0.5, 1, 0)})
+table(low.test, bwt$below.2500[-train])
+mean(low.test == bwt$below.2500[-train])
+```
+
+##Results and Conclusion
 
 
 

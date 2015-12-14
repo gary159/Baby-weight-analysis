@@ -319,11 +319,12 @@ We can see that the resulting p-value is a little above $0.066$. Thus depending 
 library(MASS)
 data(birthwt)
 bwt <- with(birthwt, {
+  low <- (bwt <= 2300)
   race <- factor(race, labels = c("white", "black", "other"))
   ptd <- factor(ptl > 0)
   ftv <- factor(ftv)
   levels(ftv)[-(1:2)] <- "2+"
-  data.frame(as.factor(low), age, lwt, race, smoke = (smoke > 0),
+  data.frame(low, age, lwt, race, smoke = (smoke > 0),
              ptd, ht = (ht > 0), ui = (ui > 0), ftv)
 })
 colnames(bwt) <- c("below.2500", "mother.age", 
@@ -348,7 +349,8 @@ table(low.train, bwt$below.2500[train])
 mean(low.train == bwt$below.2500[train])
 
 pred.test <- predict(log.fit, newdata = bwt[-train, -1], type = "response")
-low.test <- sapply(pred.test, function(x) {ifelse(x > 0.5, 1, 0)})
+hist(pred.test)
+low.test <- sapply(pred.test, function(x) {ifelse(x > 0.2, 1, 0)})
 table(low.test, bwt$below.2500[-train])
 mean(low.test == bwt$below.2500[-train])
 ```
