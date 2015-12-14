@@ -59,38 +59,42 @@ mse
 
 Now that we have tried a lot of different polynomial regressions we can wonder if it is possible to improve our best polynomial model by introducing splines. Here we added in the regression formula several basis functions for the variable $mother.weight$. Between each knots we fit a $9-degree-polynomial$. We tried different values for the number of degrees of freedom so as to find the best parameter. Here is the resulting plot:
 
-
 ```{r}
 max_df = 20
 MSE = 9:(max_df)
-for (k in 9:max_df)
-{
-splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + bs(mother.weight, df=k, degree=9) + poly(mother.age, 2), data=bwt.grams.train)
-pred = predict(splines.fit, bwt.grams.test)
-mse = mean((pred-bwt.grams.test$baby.grams)^2)
-MSE[k-8] = mse
+for (k in 9:max_df){
+    splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor 
+                     + bs(mother.weight, df=k, degree=9) + poly(mother.age, 2), 
+                     data=bwt.grams.train)
+    pred = predict(splines.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-8] = mse
 }
-plot(9:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', main='Evolution of the test MSE with the number of degrees of freedom', type='b')
+plot(9:max_df, MSE, xlab='Degrees of freedom', 
+     ylab='Test MSE', 
+     main='Evolution of the test MSE with the number of degrees of freedom', 
+     type='b')
 abline(.3214657, 0, col='RED')
 legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
 ```
 
 The minimum MSE is obtained when we have 14 degrees of freedom. With the R built-in function $bs()$, R automatically puts knots on the quantile values of the variable. Here for 14 degrees of freedom our knots are: $q_{16.7}$, $q_{33.3}$, $q_{50}$, $q_{66.7}$ and $q_{83.3}$. Thus between each quantile R fits a degree 9 polynomial on the mothers' weights. It also makes sure that the 1st, 2nd, ... and 8th derivatives are continuous at each knots. Thus the relation between the number of degrees of freedom $d$ and the number of knots $K$ is the following: $$d = K + 9$$ We can see that this formula is verified in our case ($14 = 5 + 9$). 
 
-
-
 #With natural splines
 ```{r}
 max_df = 20
 MSE = 3:(max_df)
-for (k in 3:max_df)
-{
-splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + ns(mother.weight, df=k) + poly(mother.age, 2), data=bwt.grams.train)
-pred = predict(splines.fit, bwt.grams.test)
-mse = mean((pred-bwt.grams.test$baby.grams)^2)
-MSE[k-2] = mse
+for (k in 3:max_df){
+    splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor 
+                  + ns(mother.weight, df=k) + poly(mother.age, 2), 
+                  data=bwt.grams.train)
+    pred = predict(splines.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-2] = mse
 }
-plot(3:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', main='Evolution of the test MSE withs the number of degrees of freedom', type='b', ylim=c(0.3,0.45))
+plot(3:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', 
+     main='Evolution of the test MSE withs the number of degrees of freedom', 
+     type='b', ylim=c(0.3,0.45))
 abline(.3214657, 0, col='RED')
 legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
 ```
@@ -102,12 +106,12 @@ Now we can try to see if there is an improvement if we use smoothed splines. We 
 ```{r}
 library(gam)
 MSE = 4:18
-for (k in 4:18)
-{
-gam.fit = gam(baby.grams ~ prev.labor+uterine+ hypertension + smoke + s(mother.weight, k) + poly(mother.age, 2), data=bwt.grams.train)
-pred = predict(gam.fit, bwt.grams.test)
-mse = mean((pred-bwt.grams.test$baby.grams)^2)
-MSE[k-3] = mse
+for (k in 4:18){
+    gam.fit = gam(baby.grams ~ prev.labor+uterine+ hypertension + smoke 
+                  + s(mother.weight, k) + poly(mother.age, 2), data=bwt.grams.train)
+    pred = predict(gam.fit, bwt.grams.test)
+    mse = mean((pred-bwt.grams.test$baby.grams)^2)
+    MSE[k-3] = mse
 }
 plot(4:18, MSE, type='b', main='Evolution of the MSE', xlab='Degrees of freedom')
 ```
@@ -116,9 +120,11 @@ We can notice that the results are still not better than with our optimal model 
 To conclude this part on splines we managed to find a model that outperforms slightly our best polynomial model. This was expected as splines models are more flexible than polynomial models. Nonetheless the improvement in test MSE is quite low and we can wonder if the splines model is really better than the polynomial model. Indeed, fitting a degree nine polynomial between each splines brings a lot of flexibility to the model but the increase of variance can be huge too. If we have had more observations we could have answered to this question by testing our models on a big test set. Nevertheless we can run a ANOVA test to verify if the difference between our best polynomial model and our best splines model is really significant:
 
 ```{r}
-best_poly = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+best_poly = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor 
+               + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
 
-best_splines = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + ns(mother.weight, df=14) + poly(mother.age, 2), data=bwt.grams.train)
+best_splines = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor 
+                  + ns(mother.weight, df=14) + poly(mother.age, 2), data=bwt.grams.train)
 
 anova(best_poly, best_splines)
 ```
