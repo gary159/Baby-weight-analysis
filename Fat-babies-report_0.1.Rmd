@@ -214,7 +214,8 @@ par(mfrow = c(2, 2))
 plot(lm.fit)
 ```
 
-
+#Polynomial Models  
+  
 ```{r}
 
 #Create train and test
@@ -224,43 +225,81 @@ bwt.grams.train <- bwt.grams[train,]
 bwt.grams.test <- bwt.grams[-train,]
 
 #Polynomial fit for best subset
-poly.fit.1 = lm(baby.grams ~ hypertension + uterine + smoke + race + poly(mother.weight, 2), data = bwt.grams.train)
+poly.fit.1 = lm(baby.grams ~ hypertension + uterine + smoke + race  
+                + poly(mother.weight, 2), data = bwt.grams.train)
 mean((predict.lm(poly.fit.1, bwt.grams.test) - bwt.grams.test[,1])^2)
-plot(sort(predict.lm(poly.fit.1, bwt.grams.test)), bwt.grams.test[,1])
-anova(poly.fit.1)
+plot(sort(predict.lm(poly.fit.1, bwt.grams.test)), bwt.grams.test[,1], 
+            xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
 ```   
   
-When we fit a polynomial model on the predictors obtained from best subset, we observe a Mean Squared Error of `0.4813745`. The smaller the Mean Squared Error, the closer the fit is to the data. But, as he value of MSE is high, it suggests that this model does not provide a good fit for the data. The plot also shows that there are irregularities in the prediction and that the polynomial model of degree 2 obtained by using predictors suggested by the best subset is not sufficient. When we perform Analysis of Variance (ANOVA) on the polynomial fit, we see that, the _p-values_ for the all the predictors - except `mother.weight` are less that `0.5` and thus, the NULL hypothesis that these variables affect the baby weight at birth can be rejected.  
+When we fit a polynomial model on the predictors obtained from best subset, we observe a Mean Squared Error of `0.4813745`. The smaller the Mean Squared Error, the closer the fit is to the data. But, as he value of MSE is high, it suggests that this model does not provide a good fit for the data. The plot also shows that there are irregularities in the prediction and that the polynomial model of degree 2 obtained by using predictors suggested by the best subset is not sufficient.    
 
 Different models were tried by increasing the degree of the polynomial but still using the predictors suggested by the best subset and the following results were obtained:  
 ```{r}
-poly.fit.2 = lm(baby.grams ~ hypertension + uterine + smoke + race + poly(mother.weight, 3), data = bwt.grams.train)
+poly.fit.2 = lm(baby.grams ~ hypertension + uterine + smoke + race  
+                + poly(mother.weight, 3), data = bwt.grams.train)
 mean((predict.lm(poly.fit.2, bwt.grams.test) - bwt.grams.test[,1])^2)
 
-poly.fit.3 = lm(baby.grams ~ hypertension + uterine + smoke + race + poly(mother.weight, 4), data = bwt.grams.train)
+poly.fit.3 = lm(baby.grams ~ hypertension + uterine + smoke + race  
+                + poly(mother.weight, 4), data = bwt.grams.train)
 mean((predict.lm(poly.fit.3, bwt.grams.test) - bwt.grams.test[,1])^2)
-
-anova(poly.fit.1, poly.fit.2, poly.fit.3)
 ```  
   
-We note that as the degree of the polynomial increases, the MSE decreases, but the drop is not significant, suggesting that these predictors are not sufficient enough to predict the correct baby weight. Performing the ANOVA test to compare how the three models perform with respect to each other, we observe high _p-values_ which state that the none of the models are good enough.  
+We note that as the degree of the polynomial increases, the MSE decreases, but the drop is not significant, suggesting that these predictors are not sufficient enough to predict the correct baby weight.  
   
 When we remove the predictors with very low _p-values_, which were suggested by the best subset - namely `smoke`, `race` and add other predictors which were rejected by the best-subset, namely - `mother.age`, `prem.labor` and `physician.visits`, we see that the Mean Squared Error starts to decrease. A low MSE denotes a better fit. Thus, the predictors which were rejected by the best subset selection, were actually significant in predicting the correct birthweight.   
   
 ```{r}
-poly.fit.4 = lm(baby.grams ~ hypertension + uterine + poly(mother.age,2) + poly(mother.weight,3), data = bwt.grams.train)
+poly.fit.4 = lm(baby.grams ~ hypertension + uterine + poly(mother.age,2)  
+                + poly(mother.weight,3), data = bwt.grams.train)
 mean((predict.lm(poly.fit.4, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+When we fit a polynomial model using `mother.age` as one of the predictors, we see a significant change in the Mean Squared Error value. Even though best-subset rejected `mother.age`, the lower Mean Squared Error denotes that the predictor does affect the baby weight - `baby.grams`. Thus, clearly the fact that `mother.age` affects the `baby.grams` cannot be rejected.  
 
-poly.fit.5 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + poly(mother.age,2) + poly(mother.weight,3), data = bwt.grams.train)
+Now, we try another model, where we will choose some of the predictors suggested by the best-subset and some predictors from the previous model. We fit a polynomial of degree `2` on `mother.age` and a degree `3` polynomial on `mother.weight`. When the predict the `baby.grams` on the test set, we observe a mean squared error of `0.3865828`, which is not a big significant change from `0.3890751` - the mean squared error from `poly.fit.4`.  
+  
+
+```{r}
+poly.fit.5 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,3), data = bwt.grams.train)
 mean((predict.lm(poly.fit.5, bwt.grams.test) - bwt.grams.test[,1])^2)
-
-poly.fit.6 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + poly(mother.age,2) + poly(mother.weight,9), data = bwt.grams.train)
+```  
+  
+Now we increase the degrees of the polynomials to figure out if the mean squared error reduces as the degree of the polynomial increases.  
+  
+```{r}
+poly.fit.6 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,9), data = bwt.grams.train)
 mean((predict.lm(poly.fit.6, bwt.grams.test) - bwt.grams.test[,1])^2)
-```
+```  
+  
+It is no surprise that the MSE decreases as the degree of the polynomial increases. The lowest MSE obtained is `0.3214657` which is obtained when `mother.weight` is used as a predictor as a polynomial of degree `9`. This can be confirmed from the following plot:  
 
-
-
-
+```{r}
+MSE = 1:13
+for (k in 1:13)
+{
+  poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,k), data = bwt.grams.train)
+  pred = predict(poly.fit, bwt.grams.test)
+  mse = mean((pred-bwt.grams.test$baby.grams)^2)
+  MSE[k] = mse
+}
+plot(c(1:13), MSE, type='b', main='Evolution of the MSE', xlab='Degree of Polynomial')
+abline(MSE[9], 0, col='RED')
+```  
+  
+The plot above suggests that the lowest MSE is obtained when the degree is `9` and as the degree of the polynomial increases above 9, the MSE starts increasing. The MSE versus Degree of Polynomial plot is a U-shaped curve.  
+  
+We now plot the predicted weight vs actual weight of the babies on the test data set:  
+  
+```{r}
+plot(sort(predict.lm(poly.fit.6, bwt.grams.test)), bwt.grams.test[,1], 
+            xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
+```  
+  
+If we compare this plot to the first plot of Predicted vs Actual baby weight, we can clearly see that this is a much better fitting model.
 
 
 
