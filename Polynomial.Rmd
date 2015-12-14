@@ -1,0 +1,52 @@
+---
+title: "Polynomial"
+author: "Arushi Arora"
+date: "December 14, 2015"
+output: pdf_document
+---
+which is not a big significant change from `0.3890751` - the mean squared error from `poly.fit.4`.  
+  
+
+```{r}
+poly.fit.5 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,3), data = bwt.grams.train)
+mean((predict.lm(poly.fit.5, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+Now we increase the degrees of the polynomials to figure out if the mean squared error reduces as the degree of the polynomial increases.  
+  
+```{r}
+poly.fit.6 = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,9), data = bwt.grams.train)
+mean((predict.lm(poly.fit.6, bwt.grams.test) - bwt.grams.test[,1])^2)
+```  
+  
+It is no surprise that the MSE decreases as the degree of the polynomial increases. The lowest MSE obtained is `0.3214657` which is obtained when `mother.weight` is used as a predictor as a polynomial of degree `9`. This can be confirmed from the following plot:  
+
+```{r}
+MSE = 1:13
+for (k in 1:13)
+{
+  poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor  
+                + poly(mother.age,2) + poly(mother.weight,k), data = bwt.grams.train)
+  pred = predict(poly.fit, bwt.grams.test)
+  mse = mean((pred-bwt.grams.test$baby.grams)^2)
+  MSE[k] = mse
+}
+plot(c(1:13), MSE, type='b', main='Evolution of the MSE', xlab='Degree of Polynomial')
+abline(MSE[9], 0, col='RED')
+```  
+  
+The plot above suggests that the lowest MSE is obtained when the degree is `9` and as the degree of the polynomial increases above 9, the MSE starts increasing. The MSE versus Degree of Polynomial plot is a U-shaped curve.  
+  
+We now plot the predicted weight vs actual weight of the babies on the test data set:  
+  
+```{r}
+plot(sort(predict.lm(poly.fit.6, bwt.grams.test)), bwt.grams.test[,1], 
+            xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
+```  
+  
+If we compare this plot to the first plot of Predicted vs Actual baby weight, we can clearly see that this is a much better fitting model.
+
+
+
