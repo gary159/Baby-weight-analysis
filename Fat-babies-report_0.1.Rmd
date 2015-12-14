@@ -1,0 +1,219 @@
+---
+title: '[STAT W4702] Statistical Inference & Modelling Group Project'
+author: "Babies"
+date: "12 December 2015"
+output: pdf_document
+---
+
+#Abstract
+
+#Data Set
+This project was conducted on the Low Birth Weight dataset collected in 1986 at Baystate Medical Center, Springfield, Massachusetts as a part of a bigger study on the factors influencing newborn infants' health and risk of serious health problems potentially leading to death. This dataset is distributed as a part of `MASS` library and contains **189 observations** and **10 variables**, among which `bwt` represents the exact amount of newborn infant's weight in grams and is used as the variable of interest we are trying to predict. The other 9 variables stand for different factors related to mothers' physiological parameters, such as age, weight and race, their health-related habits and behavior during pregnancy (smoking habits, presence of uterine irritability and number of physician visits). Also there is a low birth weight indicator `low`, which is defined as a binary variable showing whether the weight of an infant is below 2500 grams or not. Brief description of each variable is provided in the table below.
+
+The goal of our research is to identify relationship between these variables and infant weight and understand the influence of each of them on the explained variable. The project pursue both inferential and predictive goals as it is equally important to be able to obtain inference about factors affecting newborn's health and to be able to react on the potential health risks in a timely manner, when the model predicts the low birth weight outcome for a certain observation. In order to accomplish this goal we tried to fit multiple linear and non-linear models exploring the rationale that could provide the evidence for certain types of models and finding balance between interpretability and predictive power of the model.
+
+##Cleaning Dataset
+For the purposes of the research the dataset was cleaned in the following way:  
+
+* factor variable `race` was assigned with proper labels `white`, `black` and `other`;
+* physisian visits were converted to a factor variable `ftv` with 3 labels `0`, `1` and `2+`;
+* response is defined as an exact amount of infant's weight from `bwt`;
+* all the columns are assigned with meaningful names.
+
+Variable description table and summary statistics of the tidy dataset are provided below.
+
+Variable | Description
+---------|------------
+`baby.grams`|weight of newborn infant in grams
+`mother.age`|mother's age in years
+`mother.weight`|mother's weight in pounds at last menstrual period
+`race`|mother's race, factor variable with following labels: *white*, *black* or *other*
+`smoke`|smoking status during pregnancy, binary variable
+`prem.labor`|binary variable showing whether mother had premature labors before or not
+`hypertension`|binary variable showing whether mother had hypertension or not
+`uterine`|binary variable showing presence of uterine irritability
+`physician.visits`|number of physician visits during the first trimester: *0*, *1* or *2+*
+
+
+```{r, echo = FALSE}
+library(MASS)
+data(birthwt)
+bwt.grams <- with(birthwt, {
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(bwt, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt.grams) <- c("baby.grams", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+summary(bwt.grams)
+```
+
+Datatset has only 3 quantitative variables, however, as shown in the table below, they do not demonstrate 
+```{r, echo = FALSE}
+cor(bwt.grams[,1:3])
+```
+
+```{r, echo = FALSE}
+library(ggplot2)
+bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = race)) + geom_point()
+bw + geom_boxplot(alpha = 0.4) + facet_grid(smoke ~ race, scales = "free")
+```
+
+```{r, echo = FALSE}
+bw <- ggplot(bwt.grams, aes(mother.weight, baby.grams, colour = physician.visits)) + geom_point()
+bw + geom_boxplot(alpha = 0.4) + facet_grid(prem.labor ~ physician.visits, scales = "free")
+```
+
+```{r}
+set.seed(1)
+train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
+```
+
+```{r}
+library(MASS)
+data(birthwt)
+bwt <- with(birthwt, {
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(low, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt) <- c("below.2500", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+
+bwt.grams <- with(birthwt, {
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(bwt, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt.grams) <- c("baby.grams", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+summary(bwt)
+summary(bwt.grams)
+bwt[0:10,]
+bwt.grams[0:10,]
+attach(bwt.grams)
+
+library (leaps)
+regfit.full=regsubsets(baby.grams~., bwt.grams, nvmax =19)
+reg.summary = summary(regfit.full)
+reg.summary$rsq
+par(mfrow =c(2,2))
+plot(reg.summary$rss ,xlab=" Number of Variables ",ylab=" RSS", type="l")
+plot(reg.summary$adjr2 ,xlab =" Number of Variables ", ylab=" Adjusted RSq",type="l")
+max.adjr2=which.max (reg.summary$adjr2)
+max.adjr2
+points (max.adjr2, reg.summary$adjr2[max.adjr2], col ="red",cex =2, pch =20)
+
+
+plot(reg.summary$cp ,xlab =" Number of Variables ", ylab="Cp", type='l')
+min.cp= which.min (reg.summary$cp )
+min.cp
+points (min.cp, reg.summary$cp[min.cp], col ="red",cex =2, pch =20)
+
+
+min.bic = which.min(reg.summary$bic)
+min.bic
+plot(reg.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
+points (min.bic, reg.summary$bic [min.bic], col =" red",cex =2, pch =20)
+
+plot(regfit.full ,scale ="r2")
+plot(regfit.full ,scale ="adjr2")
+plot(regfit.full ,scale ="Cp")
+plot(regfit.full ,scale ="bic")
+
+coef(regfit.full, max.adjr2) 
+coef(regfit.full, min.cp)
+coef(regfit.full, min.bic)
+
+
+
+
+
+
+classfit.full=regsubsets(below.2500~., bwt, nvmax =19)
+class.summary = summary(classfit.full)
+class.summary$rsq
+par(mfrow =c(2,2))
+plot(class.summary$rss ,xlab=" Number of Variables ",ylab=" RSS", type="l")
+plot(class.summary$adjr2 ,xlab =" Number of Variables ", ylab=" Adjusted RSq",type="l")
+max.adjr2=which.max (class.summary$adjr2)
+max.adjr2
+points (max.adjr2, class.summary$adjr2[max.adjr2], col ="red",cex =2, pch =20)
+
+
+plot(class.summary$cp ,xlab =" Number of Variables ", ylab="Cp", type='l')
+min.cp= which.min (class.summary$cp )
+min.cp
+points (min.cp, class.summary$cp[min.cp], col ="red",cex =2, pch =20)
+
+
+min.bic = which.min(class.summary$bic)
+min.bic
+plot(class.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
+points (min.bic, class.summary$bic [min.bic], col =" red",cex =2, pch =20)
+
+plot(classfit.full ,scale ="r2")
+plot(classfit.full ,scale ="adjr2")
+plot(classfit.full ,scale ="Cp")
+plot(classfit.full ,scale ="bic")
+
+coef(classfit.full, max.adjr2) 
+coef(classfit.full, min.cp)
+coef(classfit.full, min.bic)
+
+
+
+#Let's compare classification and regression 
+par(mfrow =c(1,2))
+plot(classfit.full ,scale ="Cp")
+plot(regfit.full ,scale ="Cp")
+
+
+#Logistic regression with the predictors selected by best subset
+log.fit = glm( below.2500~ mother.weight+race+smoke+hypertension+uterine, family = binomial, data=bwt[train, ])
+summary(log.fit)
+confint(log.fit)
+par(mfrow = c(2, 2))
+plot(log.fit)
+
+pred.train <- predict(log.fit, type = "response")
+low.train <- sapply(pred.train, function(x) {ifelse(x > 0.5, 1, 0)})
+table(low.train, bwt$below.2500[train])
+mean(low.train == bwt$below.2500[train])
+
+pred.test <- predict(log.fit, newdata = bwt[-train, -1], type = "response")
+low.test <- sapply(pred.test, function(x) {ifelse(x > 0.5, 1, 0)})
+table(low.test, bwt$below.2500[-train])
+mean(low.test == bwt$below.2500[-train])
+
+#Linear regression with the predictors selected by best subset
+lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams)
+summary(lm.fit)
+confint(lm.fit)
+par(mfrow = c(2, 2))
+plot(lm.fit)
+```
+
+
+
+
+
+
