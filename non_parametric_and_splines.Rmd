@@ -1,0 +1,126 @@
+---
+title: "Stats Project"
+output: html_document
+---
+
+\section*{Non parametric analysis}
+
+We have a dataset containing the weights of the babies of 189 women. We want to explore this dataset so as to understand what are the factors responsible for a low weight baby. It is relevant to ask such a question because low weight babies have a higher mortality rate than normal or over weight babies. Thus, understanding the factors that can influence the baby weight is an important question. 
+First lets have a look on the distribution of the babies' weights.
+
+```{r}
+setwd('/Users/eloimorlaas/Documents/Columbia/Fall_2015/Statistical Inference & Modeling/project')
+load('WorkSpace.RData')
+hist(bwt.grams$baby.grams, breaks=50, xlab='Baby weight in grams', main = 'Histogram of the babies weight')
+```
+
+Given this histogram it is quite hard to estimate if the data is truly normally distributed, thus we can draw the corresponding QQ plot.
+
+```{r}
+qqnorm(bwt.grams$baby.grams, main="QQ plot")
+qqline(bwt.grams$baby.grams)
+```
+
+Here we can notice that the observations are quite well aligned on the line which means that the sample quantiles correspond to the quantile of a theoritical normal distribution. So as to test this hypothesis we can run a Shapiro-Wilk test.
+
+```{r}
+shapiro.test(bwt.grams$baby.grams)
+```
+We have a very high p-value that is significantly greater than 0.05 thus we can accept the null hypothesis of the test and conclude that our data is normally distributed.
+
+```{r}
+plot(factor(birthwt$smoke, labels=c('no', 'yes')), birthwt$bwt, xlab="Does the mother smoke ?", ylab="Babies weights")
+```
+
+We can see that the variable "smoke" seems to have a negative influence on the weight of the baby. We want to statistically verify our assumption. Even if we know that we can assume the data to be normally distributed we can notheless try a non parametric approach to answer the question by running a Mann-Whitney test. With this test we determine whether the median of the babies weights differs between two groups: when the mother smokes or not. For this test to work we need the distribution of babies weight to have the same shape in both groups. We can easily verify it in these histograms.
+
+```{r}
+hist(bwt.grams$baby.grams[bwt.grams$smoke==FALSE], breaks=20, main='Histogram non smoker', xlab="Babies weights")
+hist(bwt.grams$baby.grams[bwt.grams$smoke==TRUE], breaks=20, main='Histogram smokers', xlab='Babies weights')
+wilcox.test(bwt.grams$baby.grams ~ bwt.grams$smoke)
+```
+
+We can see that the p-value is below 0.05 thus we can reject the null hypothesis and conclude that the median of our two populations are not equal, thus the variable "smoke" appears to be a variable that can have a certain predictive power in predicting the baby's weight. Nevertheless here we have seen that we can assume the data to be normally distributed thus it is more appropriate to do the alternative parametric test: a 2 sample t-test. Indeed, parametric tests are usually more powerful than their corresponding non parametric tests. Thus, we are less likely to reject the null hypothesis when it is false. Then, if we run a t-test we have the following results:
+
+```{r}
+t.test(bwt.grams$baby.grams[bwt.grams$smoke==FALSE], bwt.grams$baby.grams[bwt.grams$smoke==TRUE])
+```
+We can notice that this test is considering the mean and not the median as before. We have here a very low p-value that allows us to reject the null hypothesis and conclude that the difference in means of the two samples is not equal to 0. It confirms that the variable "smoke" is a discriminative variable for predicting the weight. 
+
+
+# Splines Analysis
+```{r}
+library(splines)
+poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+pred = predict.lm(poly.fit, bwt.grams.test)
+mse = mean((pred - bwt.grams.test[,1])^2)
+mse
+```
+
+Now that we have tried a lot of different polynomial regressions we can wonder if it is possible to improve our best polynomial model by introducing splines. Here we added in the regression formula several basis functions for the variable $mother.weight$. Between each knots we fit a $9-degree-polynomial$. We tried different values for the number of degrees of freedom so as to find the best parameter. Here is the resulting plot:
+
+
+```{r}
+max_df = 20
+MSE = 9:(max_df)
+for (k in 9:max_df)
+{
+splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + bs(mother.weight, df=k, degree=9) + poly(mother.age, 2), data=bwt.grams.train)
+pred = predict(splines.fit, bwt.grams.test)
+mse = mean((pred-bwt.grams.test$baby.grams)^2)
+MSE[k-8] = mse
+}
+plot(9:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', main='Evolution of the test MSE with the number of degrees of freedom', type='b')
+abline(.3214657, 0, col='RED')
+legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
+```
+
+The minimum MSE is obtained when we have 14 degrees of freedom. With the R built-in function $bs()$, R automatically puts knots on the quantile values of the variable. Here for 14 degrees of freedom our knots are: $q_{16.7}$, $q_{33.3}$, $q_{50}$, $q_{66.7}$ and $q_{83.3}$. Thus between each quantile R fits a degree 9 polynomial on the mothers' weights. It also makes sure that the 1st, 2nd, ... and 8th derivatives are continuous at each knots. Thus the relation between the number of degrees of freedom $d$ and the number of knots $K$ is the following: $$d = K + 9$$ We can see that this formula is verified in our case ($14 = 5 + 9$). 
+
+
+
+#With natural splines
+```{r}
+max_df = 20
+MSE = 3:(max_df)
+for (k in 3:max_df)
+{
+splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + ns(mother.weight, df=k) + poly(mother.age, 2), data=bwt.grams.train)
+pred = predict(splines.fit, bwt.grams.test)
+mse = mean((pred-bwt.grams.test$baby.grams)^2)
+MSE[k-2] = mse
+}
+plot(3:max_df, MSE, xlab='Degrees of freedom', ylab='Test MSE', main='Evolution of the test MSE withs the number of degrees of freedom', type='b', ylim=c(0.3,0.45))
+abline(.3214657, 0, col='RED')
+legend("topleft", c('Best poly model'), col=c('RED'), lty=c(1))
+```
+
+When we try with natural splines we have worse results than with the normal splines model. It is mainly due to the fact that R can only fit cubic natural splines, there is no degree argument in the R built-in function.
+
+Now we can try to see if there is an improvement if we use smoothed splines. We have to use the General Additive Models R library to perform this analysis.
+
+```{r}
+library(gam)
+MSE = 4:18
+for (k in 4:18)
+{
+gam.fit = gam(baby.grams ~ prev.labor+uterine+ hypertension + smoke + s(mother.weight, k) + poly(mother.age, 2), data=bwt.grams.train)
+pred = predict(gam.fit, bwt.grams.test)
+mse = mean((pred-bwt.grams.test$baby.grams)^2)
+MSE[k-3] = mse
+}
+plot(4:18, MSE, type='b', main='Evolution of the MSE', xlab='Degrees of freedom')
+```
+
+We can notice that the results are still not better than with our optimal model with degree 9 splines. The smoothing effect does not bring more predictive power to the final model. 
+To conclude this part on splines we managed to find a model that outperforms slightly our best polynomial model. This was expected as splines models are more flexible than polynomial models. Nonetheless the improvement in test MSE is quite low and we can wonder if the splines model is really better than the polynomial model. Indeed, fitting a degree nine polynomial between each splines brings a lot of flexibility to the model but the increase of variance can be huge too. If we have had more observations we could have answered to this question by testing our models on a big test set. Nevertheless we can run a ANOVA test to verify if the difference between our best polynomial model and our best splines model is really significant:
+
+```{r}
+best_poly = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
+
+best_splines = lm(baby.grams ~ hypertension + uterine + smoke + prev.labor + ns(mother.weight, df=14) + poly(mother.age, 2), data=bwt.grams.train)
+
+anova(best_poly, best_splines)
+```
+
+We can see that the resulting p-value is a little above $0.066$. Thus depending on the level of the test we want, we may reject or accept $H_0$. Nevertheless we can say that the difference of performance between those two tests is not obvious. Thus we will maybe prefer to keep the less complex model $ie$ the polynomial model.
