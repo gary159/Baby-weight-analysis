@@ -3,7 +3,7 @@ title: Master - Predicting baby weight - v1 - [STAT W4702] Statistical Inference
   Modelling Group Project
 author: "Arushi Arora, Alexander Makarov, Eloi Morlaas, Gary Sztajnman"
 date: "December 15, 2015"
-output: word_document
+output: pdf_document
 ---
 #Abstract
 
@@ -82,9 +82,7 @@ The second chart splits all the observations in sample into several groups by nu
 
 
 \section*{Non parametric analysis}
-
-We have a dataset containing the weights of the babies of 189 women. We want to explore this dataset so as to understand what are the factors responsible for a low weight baby. It is relevant to ask such a question because low weight babies have a higher mortality rate than normal or over weight babies. Thus, understanding the factors that can influence the baby weight is an important question. 
-First lets have a look on the distribution of the babies' weights.
+It is well known by doctors that low weight babies have a higher mortality rate than normal or over weight babies. Thus, understanding the factors that can influence the baby weight is an important question. So as to answer to such a broad question we will begin by looking at the shape of the distribution of the babies weights. It will allow us to argue whether a parametric or a non parametric model is the best for this dataset.
 
 ```{r}
 hist(bwt.grams$baby.grams, breaks=50, xlab='Baby weight in grams', main = 'Histogram of the babies weight')
@@ -92,7 +90,7 @@ hist(bwt.grams$baby.grams, breaks=50, xlab='Baby weight in grams', main = 'Histo
 
 Given this histogram it is quite hard to estimate if the data is truly normally distributed, thus we can draw the corresponding QQ plot.
 
-```{r}
+```{r, echo=FALSE}
 qqnorm(bwt.grams$baby.grams, main="QQ plot")
 qqline(bwt.grams$baby.grams)
 ```
@@ -104,24 +102,30 @@ shapiro.test(bwt.grams$baby.grams)
 ```
 We have a very high p-value that is significantly greater than 0.05 thus we can accept the null hypothesis of the test and conclude that our data is normally distributed.
 
-```{r}
+```{r, echo=FALSE}
 plot(factor(birthwt$smoke, labels=c('no', 'yes')), birthwt$bwt, xlab="Does the mother smoke ?", ylab="Babies weights")
 ```
 
 We can see that the variable "smoke" seems to have a negative influence on the weight of the baby. We want to statistically verify our assumption. Even if we know that we can assume the data to be normally distributed we can notheless try a non parametric approach to answer the question by running a Mann-Whitney test. With this test we determine whether the median of the babies weights differs between two groups: when the mother smokes or not. For this test to work we need the distribution of babies weight to have the same shape in both groups. We can easily verify it in these histograms.
 
-```{r}
+```{r, echo=FALSE}
+par(mfrow =c(1,2))
 hist(bwt.grams$baby.grams[bwt.grams$smoke==FALSE], breaks=20, main='Histogram non smoker', xlab="Babies weights")
 hist(bwt.grams$baby.grams[bwt.grams$smoke==TRUE], breaks=20, main='Histogram smokers', xlab='Babies weights')
+```
+
+We can notice that the two histograms have approximately the same shape, then we can apply the Wilcoxon test to verify if the two populations have same central tendancy or not without assuming them to follow the normal distribution.
+
+```{r}
 wilcox.test(bwt.grams$baby.grams ~ bwt.grams$smoke)
 ```
 
-We can see that the p-value is below 0.05 thus we can reject the null hypothesis and conclude that the median of our two populations are not equal, thus the variable "smoke" appears to be a variable that can have a certain predictive power in predicting the baby's weight. Nevertheless here we have seen that we can assume the data to be normally distributed thus it is more appropriate to do the alternative parametric test: a 2 sample t-test. Indeed, parametric tests are usually more powerful than their corresponding non parametric tests. Thus, we are less likely to reject the null hypothesis when it is false. Then, if we run a t-test we have the following results:
+We can see that the p-value is below 0.05 thus we can reject the null hypothesis and conclude that the median of our two populations are not equal, thus the variable "smoke" appears to be a variable that can have a certain predictive power in predicting the baby's weight. Nevertheless here we have seen that we can assume the data to be normally distributed thus it is more appropriate to do the alternative parametric test: a 2 sample t-test. Indeed, parametric tests are usually more powerful than their corresponding non parametric tests. Thus, in a non parametric test we are usually less likely to reject the null hypothesis when it is false. Then, if we run a t-test (we return into the parametric world) we have the following results:
 
 ```{r}
 t.test(bwt.grams$baby.grams[bwt.grams$smoke==FALSE], bwt.grams$baby.grams[bwt.grams$smoke==TRUE])
 ```
-We can notice that this test is considering the mean and not the median as before. We have here a very low p-value that allows us to reject the null hypothesis and conclude that the difference in means of the two samples is not equal to 0. It confirms that the variable "smoke" is a discriminative variable for predicting the weight. 
+We can notice that this test is considering the mean and not the median as before. We have here a very low p-value that allows us to reject the null hypothesis and conclude that the difference in means of the two samples is not equal to 0. It confirms that the variable "smoke" is a discriminative variable for predicting the weight. We will confirm this intuition in the models we will build in the next parts.
 
 
 
@@ -135,13 +139,17 @@ In order to decide which predictors to choose, we use multiple techniques:
   - the lasso regression
 
 \section{Best subset selection}
+To begin we will first seperate the data into a train and a test set so as to be able to compare our models on their test error rather than on their training error (we know that the training error is a poor estimate of the real error of a model). We choose a 75%/25% train/test split. We have to keep in mind here that the test set will only contain 48 observations, thus it might not be a perfect estimator of the overall performance of a model.
+
 ```{r}
 #create train and test
 set.seed(1)
 train <- sample(1:nrow(bwt.grams), floor(0.75*nrow(bwt.grams)))
 bwt.grams.train <- bwt.grams[train,]
 bwt.grams.test <- bwt.grams[-train,]
+```
 
+```{r, echo=FALSE}
 library (leaps)
 regfit.full=regsubsets(baby.grams~., bwt.grams.train, nvmax =19)
 reg.summary = summary(regfit.full)
@@ -162,39 +170,37 @@ plot(reg.summary$bic ,xlab=" Number of Variables ",ylab=" BIC", type='l')
 points (min.bic, reg.summary$bic [min.bic], col =" red",cex =2, pch =20)
 
 ```
+
 We applied the best subset method on the training set and we compare 3 indicators: BIC, Cp and adjusted R^2. All 3 indicators converge in the idea that we should only consider 6 predicators in our analysis.
 ```{r}
 par(mfrow =c(1,1))
 plot(regfit.full ,scale ="Cp")
-
-
 ```
-We select the predictors that minimize RSS: mother.weight, race, smoke, hypertension, uterine
 
+We select the predictors that minimize $C_p$: mother.weight, race, smoke, hypertension, uterine.
 Now we want to measure the quality of a linear regression using the predictors selected  by the best subset method.
-```{r}
 
+```{r, echo=FALSE}
 #Linear regression with the predictors selected by best subset
 lm.fit = lm( baby.grams~ mother.weight+race+smoke+hypertension+uterine, data=bwt.grams.train)
 summary(lm.fit)
 ```
-Based on the summary, we note that the linear regression model is decent as all predictors have a p-value lower than 0.05 however the R^2 is small with a value of 0.31
+Based on the summary, we note that the linear regression model is decent as all predictors have a p-value lower than 0.05 however the $R^2$ is small with a value of 0.31 $ie$ only 31% of the variance of the data is explained by our model. We will see that it is quite hard to do far much better.
 
-We will know apply or model on the test set in order to test its accuracy
-```{r}
+We now apply our model on the test set in order to test its accuracy:
+```{r, echo=FALSE}
 par(mfrow = c(1, 1))
 lm.fit.res= predict(lm.fit, bwt.grams.test)
-mean((lm.fit.res -bwt.grams.test$baby.grams)^2)
+cat('MSE best model = ', mean((lm.fit.res -bwt.grams.test$baby.grams)^2))
 #plot(bwt.grams.test$baby.grams,lm.fit.res)
 #abline (0,1)
-
 ```
-Here we note that this linear model has a low accuracy on our test set with a MSE of 0.46
+Here we note that this linear model has a low accuracy on our test set with a MSE of 0.46. Thus the corresponding mean squared error is: 0.678 Kg which is very high for predicting the weight of a baby as the weights range from 0.709 Kg to 4.99 Kg.
 
-We will then try 2 shrinkage methods
+We will then try 2 shrinkage methods to see if we can improve our results.
+
 \section{Shrinkage methods}
-```{r}
-
+```{r, echo=FALSE}
 library(glmnet)
 ## Preparing the dataset for glmnet
 bwt.x.train=model.matrix( baby.grams~., data=bwt.grams.train)[,-1]
@@ -209,44 +215,52 @@ par(mfrow = c(2, 2))
 In both case (ridge and lasso), we will test 100 different tuning parameter lambda to find the one that minimize the error on 6 folds cross validation.
 As our database is quite small, we will change the default number of folds from k = 10 folds to k =6.
 \section{Ridge regression}
-```{r}
+```{r, echo=FALSE}
 # With alpha =0, glmnet computes the ridge
 
 ridge =cv.glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =grid.bwt, nfolds=6)
-ridge$lambda.min
+cat('Lambda min value = ', ridge$lambda.min)
 ridge.opt = glmnet(bwt.x.train,bwt.y.train,alpha =0, lambda =ridge$lambda.min)
 ridge.opt.res = predict(ridge.opt, s =ridge$lambda.min, newx=bwt.x.test)
-mean((ridge.opt.res -bwt.y.test)^2)
+cat('MSE ridge regression =', mean((ridge.opt.res -bwt.y.test)^2))
 ```
-For the ridge regression we minimize our MSE for a tuning parameter of 0.145. We then perform the ridge regression on the full training set to compute the optimal coefficients. 
-Finally, we test our model and obtain an MSE of 0.416
+For the ridge regression we minimize our MSE for a tuning parameter of 0.145. We then perform the ridge regression on the full training set to compute the optimal coefficients. Finally, we test our model and obtain an MSE of 0.416.
+
 
 \section{Lasso regression}
-```{r}
+```{r, echo=FALSE}
 # With alpha =1, glmnet computes the lasso
 
 lasso =cv.glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =grid.bwt, nfolds=6)
-par(mfrow = c(1, 2))
-plot(lasso, main="Best MSE for lasso regression")
-plot(ridge, main="Best MSE for ridge regression")
-lasso$lambda.min
+#par(mfrow = c(1, 2))
+#plot(lasso, main="Best MSE for lasso regression")
+#plot(ridge, main="Best MSE for ridge regression")
+cat('Lambda min value = ', lasso$lambda.min)
 lasso.opt = glmnet(bwt.x.train,bwt.y.train,alpha =1, lambda =lasso$lambda.min)
 lasso.opt.res = predict(lasso.opt, s =lasso$lambda.min, newx=bwt.x.test)
-mean((lasso.opt.res -bwt.y.test)^2)
+cat('MSE lasso = ', mean((lasso.opt.res -bwt.y.test)^2))
 ```
 
-For the ridge regression we minimize our MSE for a tuning parameter of 0.017. We then perform the lasso regression on the full training set to compute the optimal coefficients. 
-Finally, we test our model and obtain an MSE of 0.428
+```{r}
+par(mfrow = c(1, 2))
+plot(ridge$glmnet.fit, "lambda", label=TRUE,col=c("blue", "red", "green", "black", "purple", "yellow", "pink", "grey", "brown") )
+
+plot(lasso$glmnet.fit, "lambda", label=TRUE,col=c("blue", "red", "green", "black", "purple", "yellow", "pink", "grey", "brown") )
+legend(-1,-0.2, c(names(bwt.grams)), lty=c(1,1), lwd=c(2,2), cex=.7, col=c("blue", "red", "green", "black", "purple", "yellow", "pink", "grey", "brown"))
+```
+
+For the ridge regression we minimize our MSE for a tuning parameter of 0.017. We then perform the lasso regression on the full training set to compute the optimal coefficients. Finally, we test our model and obtain an MSE of 0.428.
+To sum up the results on subset selection we can see that shrinkage methods perform better than subset selection in term of test MSE. The best test MSE is achieved by the ridge regression.
 
 
 ##Polynomial Model
-```{r}
+```{r, echo=FALSE}
 #Polynomial fit for best subset
-poly.fit.1 = lm(baby.grams ~ hypertension + uterine + smoke + race  
-                + poly(mother.weight, 2), data = bwt.grams.train)
-mean((predict.lm(poly.fit.1, bwt.grams.test) - bwt.grams.test[,1])^2)
-plot(sort(predict.lm(poly.fit.1, bwt.grams.test)), bwt.grams.test[,1], 
+poly.fit.1 = lm(baby.grams ~ hypertension + uterine + smoke + race  + poly(mother.weight, 2), data = bwt.grams.train)
+cat('MSE polynomial model = ',mean((predict.lm(poly.fit.1, bwt.grams.test) - bwt.grams.test[,1])^2))
+plot(predict.lm(poly.fit.1, bwt.grams.test), bwt.grams.test[,1], 
             xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
+abline(0,1, col='RED')
 ```   
   
 When we fit a polynomial model on the predictors obtained from best subset, we observe a Mean Squared Error of `0.4813745`. The smaller the Mean Squared Error, the closer the fit is to the data. But, as he value of MSE is high, it suggests that this model does not provide a good fit for the data. The plot also shows that there are irregularities in the prediction and that the polynomial model of degree 2 obtained by using predictors suggested by the best subset is not sufficient.    
@@ -274,7 +288,7 @@ mean((predict.lm(poly.fit.4, bwt.grams.test) - bwt.grams.test[,1])^2)
   
 When we fit a polynomial model using `mother.age` as one of the predictors, we see a significant change in the Mean Squared Error value. Even though best-subset rejected `mother.age`, the lower Mean Squared Error denotes that the predictor does affect the baby weight - `baby.grams`. Thus, clearly the fact that `mother.age` affects the `baby.grams` cannot be rejected.  
 
-Now, we try another model, where we will choose some of the predictors suggested by the best-subset and some predictors from the previous model. We fit a polynomial of degree `2` on `mother.age` and a degree `3` polynomial on `mother.weight`. When the predict the `baby.grams` on the test set, we observe a mean squared error of `0.3865828`, which is not a big significant change from `0.3890751` - the mean squared error from `poly.fit.4`.  
+Now, we try another model, where we will choose some of the predictors suggested by the best-subset and some predictors from the previous model. We fit a polynomial of degree `2` on `mother.age` and a degree `3` polynomial on `mother.weight`. When we predict the `baby.grams` on the test set, we observe a mean squared error of `0.3865828`, which is not a big significant change from `0.3890751` - the mean squared error from `poly.fit.4`.  
   
 
 ```{r}
@@ -293,7 +307,7 @@ mean((predict.lm(poly.fit.6, bwt.grams.test) - bwt.grams.test[,1])^2)
   
 It is no surprise that the MSE decreases as the degree of the polynomial increases. The lowest MSE obtained is `0.3214657` which is obtained when `mother.weight` is used as a predictor as a polynomial of degree `9`. This can be confirmed from the following plot:  
 
-```{r}
+```{r, echo=FALSE}
 MSE = 1:13
 for (k in 1:13)
 {
@@ -303,7 +317,7 @@ for (k in 1:13)
   mse = mean((pred-bwt.grams.test$baby.grams)^2)
   MSE[k] = mse
 }
-plot(c(1:13), MSE, type='b', main='Evolution of the MSE', xlab='Degree of Polynomial')
+plot(c(1:13), MSE, type='b', main='Evolution of the test MSE', xlab='Degree of Polynomial', ylab='Test MSE')
 abline(MSE[9], 0, col='RED')
 ```  
   
@@ -311,9 +325,10 @@ The plot above suggests that the lowest MSE is obtained when the degree is `9` a
   
 We now plot the predicted weight vs actual weight of the babies on the test data set:  
   
-```{r}
-plot(sort(predict.lm(poly.fit.6, bwt.grams.test)), bwt.grams.test[,1], 
+```{r, echo=FALSE}
+plot(predict.lm(poly.fit.6, bwt.grams.test), bwt.grams.test[,1], 
             xlab="Predicted Weight", ylab="Actual Weight", main="Predicted vs Actual")
+abline(0,1, col='RED')
 ```  
   
 If we compare this plot to the first plot of Predicted vs Actual baby weight, we can clearly see that this is a much better fitting model.
@@ -321,17 +336,10 @@ If we compare this plot to the first plot of Predicted vs Actual baby weight, we
 
 
 # Splines Analysis
-```{r}
-library(splines)
-poly.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
-pred = predict.lm(poly.fit, bwt.grams.test)
-mse = mean((pred - bwt.grams.test[,1])^2)
-mse
-```
-
 Now that we have tried a lot of different polynomial regressions we can wonder if it is possible to improve our best polynomial model by introducing splines. Here we added in the regression formula several basis functions for the variable $mother.weight$. Between each knots we fit a $9-degree-polynomial$. We tried different values for the number of degrees of freedom so as to find the best parameter. Here is the resulting plot:
 
-```{r}
+```{r, echo=FALSE}
+library(splines)
 max_df = 20
 MSE = 9:(max_df)
 for (k in 9:max_df){
@@ -395,10 +403,89 @@ To conclude this part on splines we managed to find a model that outperforms sli
 best_poly = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
                + poly(mother.age, 2) + poly(mother.weight, 9), data=bwt.grams.train)
 
-best_splines = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor 
-                  + ns(mother.weight, df=14) + poly(mother.age, 2), data=bwt.grams.train)
+best_splines = splines.fit = lm(baby.grams ~ hypertension + uterine + smoke + prem.labor + bs(mother.weight, df=14, degree=9) + poly(mother.age, 2), data=bwt.grams.train)
 
 anova(best_poly, best_splines)
 ```
 
-We can see that the resulting p-value is a little above $0.066$. Thus depending on the level of the test we want, we may reject or accept $H_0$. Nevertheless we can say that the difference of performance between those two tests is not obvious.
+We can see that the resulting p-value is roughly $0.21$. Thus the p-value is really high so we may reject $H_0$: we can say that the difference of performance between those two models is not obvious. Thus we will maybe prefer to keep the less complex model $ie$ the polynomial model.
+
+
+##Building Classification Model
+
+The modelling approaches discussed above tried to use different combinations and transformations of the predictors available in the dataset to predict the exact weight of the newborn baby. None of the obtained models demonstrated solid quality results with respect to their MSE, that might suggest that these predictors are not enough to explain all the variance observed in the `baby.grams` response variable. However, the main goal of this research is to identify risk of giving birth to low-weight infant, which should be revealed during pregnancy period in order to be able to minimize this risk with appropriate medical involvement. For that we can reformulate our modelling problem as a classification problem, testing for treshold in dataset, which will split healthy infants from infants at risk, and fitting logistic regression on this binary outcome — *no* for healthy infants and *yes* for infants with low weight. 
+
+###Testing for Claassification Threshold
+
+Convential definition of low birth weight classifies a newborn infant of less than 2.5 kg as a low birth weight infant, and, as suggested by the recent studies ..., the frequency of LBW case occurance is no more than 30\%. Before we start modelling logistic regression on whether an infant will be born with normal or low weight, we need to test whether the dataset we are working on attributes the same frequency properties as the general population of such cases. 
+
+For this purposes we obtain bootstrapped estimate of the 30th percentile of `baby.grams` and compare it with 2.5 kg. 
+
+```{r, echo = FALSE}
+library(boot)
+set.seed(1)
+boot.fn <- function(data, index) {
+    return (quantile(data[index], probs = 0.3))
+}
+quant.bootstrap <- boot(bwt.grams$baby.grams, boot.fn, 1000)
+quant.bootstrap
+```
+
+The results of bootstrap test prove that 30th precentile estimate of `baby.grams` is equal to `r round(quant.bootstrap$t0, 3)` and the threshold value of 2.5 kg that we are interested in falls into 95% confidence interval of this estimate [`r round(quant.bootstrap$t0 - 2 * sd(quant.bootstrap$t), 3)`; `r round(quant.bootstrap$t0 + 2 * sd(quant.bootstrap$t), 3)`].
+
+###Fitting Logistic Regression
+
+After we proved that the decision threshold for classification on this data can indeed be assumed to be equal to 2.5 kg, we now reshape our dataset to attribute this classification problem: response is now defined as a factor variable with level *no* if the weight is above 2.5 kg, and level *yes* if the weight is below this threshold. All the rest of the transformations remain the same.
+
+```{r, echo = FALSE}
+library(MASS)
+data(birthwt)
+bwt <- with(birthwt, {
+  low <- (bwt <= 2500)
+  low <- factor(low, levels = c(T, F), labels = c("yes", "no"))
+  race <- factor(race, labels = c("white", "black", "other"))
+  ptd <- factor(ptl > 0)
+  ftv <- factor(ftv)
+  levels(ftv)[-(1:2)] <- "2+"
+  data.frame(low, age, lwt, race, smoke = (smoke > 0),
+             ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+})
+colnames(bwt) <- c("below.2500", "mother.age", 
+                       "mother.weight", "race",
+                       "smoke", "prem.labor", 
+                       "hypertension", "uterine",
+                       "physician.visits")
+summary(bwt)
+```
+
+As the strength of relationships between different predictors and the weight of the infant was explored before, we will take only those predictors that were chosen by the best subset selection procedure while fitting linear models. Since the size of the dataset is relatively small, validating the model results is better be done with *k-fold* cross validation procedure. The optimal number of folds for this dataset was chosen before: *k = 6*.
+
+```{r}
+set.seed(1)
+log.fit = glm( below.2500 ~ mother.weight+race+smoke+hypertension+prem.labor+uterine, 
+               family = binomial, 
+               data=bwt)
+cv.glm(bwt, log.fit, K = 6)$delta
+```
+
+The logistic model produced quite good results with unbiased classification error of `r round(cv.glm(bwt, log.fit, K = 6)$delta[2], 3)` after the cross-validation procedure.
+
+The summary statistics of the model and analysis of deviance provided below, demonstrate that the choice of the predictors was appropriate for this model, since all of them, but `uterine` demonstrate p-values lower than 0.1 in *t-test* for individual significance and *chi-square test*, demonstrating that the model including this variable demonstrate statistically significant difference from *null* model.
+
+```{r}
+summary(log.fit)
+anova(log.fit, test="Chisq")
+```
+
+However, the confusion matrix of this model reveals the following fact: it demonstrates solid prediction power classifying healthy infants *(10\% classification error)*, however it fails to distinguish properly the low birth weigth cases classifying *55.9\%* of them inaccurately. This is the major drawback of this model, since it does not help identifying pregnancies with low birth weight risk, thus making timely medical intervention to support infant's and mother's health condition. 
+
+```{r}
+log.pred <- predict(log.fit, type = "response")
+pred.low <- sapply(log.pred, function(x) {ifelse(x > 0.5, "no", "yes")})
+table(pred.low, bwt$below.2500, dnn = c("prediction", "below 2.5 kg"))
+```
+
+Despite low predictive power for the cases of high low birth weight risk, this model gives an important inferential conclusion that the catigorical factors that were picked for this model (smoking habits, hypertension, race, physician visits) include enough information to conclude that the infant will be born with a healthy weight, hence low risk of infant mortality. However, we should seek the relationships explaining low weight birth cases in other medical and demographical factors that were not collected for this research.
+
+##Results and Conclusion
+
