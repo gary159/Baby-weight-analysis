@@ -246,7 +246,7 @@ par(mfrow = c(1, 2))
 plot(ridge$glmnet.fit, "lambda", label=TRUE,col=c("blue", "red", "green", "black", "purple", "yellow", "pink", "grey", "brown") )
 
 plot(lasso$glmnet.fit, "lambda", label=TRUE,col=c("blue", "red", "green", "black", "purple", "yellow", "pink", "grey", "brown") )
-legend(-1,-0.2, c(names(bwt.grams)), lty=c(1,1), lwd=c(2,2), cex=.7, col=c("blue", "red", "green", "black", "purple", "yellow", "pink", "grey", "brown"))
+
 ```
 
 For the ridge regression we minimize our MSE for a tuning parameter of 0.017. We then perform the lasso regression on the full training set to compute the optimal coefficients. Finally, we test our model and obtain an MSE of 0.428.
